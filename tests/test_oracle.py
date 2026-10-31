@@ -45,6 +45,25 @@ def _tmp_repo(tmp_path):
     return repo
 
 
+def load_oracle_module(repo_root):
+    """Load the oracle module from tools/oracle using SourceFileLoader.
+
+    Args:
+        repo_root: Path to the repository root containing tools/oracle
+
+    Returns:
+        The loaded oracle module
+    """
+    import importlib.machinery
+    import importlib.util
+
+    loader = importlib.machinery.SourceFileLoader("oracle_under_test", str(repo_root / "tools" / "oracle"))
+    spec = importlib.util.spec_from_loader("oracle_under_test", loader)
+    mod = importlib.util.module_from_spec(spec)
+    loader.exec_module(mod)
+    return mod
+
+
 def _marker_case(repo, case_id="marker-case"):
     """Python-runtime case whose check passes if and only if the workspace contains a file named PASS."""
     case = repo / "cases" / case_id
@@ -2841,195 +2860,153 @@ class TestDraftCaseRejection:
 
 
 class TestHasExecutingMarker:
-    """Unit tests for has_executing_marker function via throwaway repo."""
-
-    def _create_oracle_script_with_marker(self, tmp_path):
-        """Create an oracle script with a custom marker check."""
-        repo = tmp_path / "repo"
-        (repo / "tools").mkdir(parents=True)
-        (repo / "schema").mkdir()
-        (repo / "cases").mkdir()
-
-        shutil.copy2(ORACLE_SCRIPT, repo / "tools" / "oracle")
-        shutil.copy2(SCHEMA_FILE, repo / "schema" / "case.schema.json")
-
-        # Create a test script that imports and tests the marker function
-        test_script = repo / "tools" / "test_markers.py"
-        test_script.write_text(r'''
-import sys
-import re
-
-def has_executing_marker(check_source):
-    exec_markers = [
-        "vm.runInContext",
-        "vm.runInNewContext",
-        "vm.runInThisContext",
-        "new vm.Script",
-        "new Function(",
-        "eval(",
-    ]
-    for marker in exec_markers:
-        if marker in check_source:
-            return True
-    import_pattern = r"import\(\s*(?![\"']).+?(?![\"'])\s*\)"
-    if re.search(import_pattern, check_source):
-        return True
-    return False
-
-# Test code from stdin
-check_source = sys.stdin.read()
-result = has_executing_marker(check_source)
-print("DETECTED" if result else "NOT_DETECTED")
-''')
-        return test_script
+    """Unit tests for has_executing_marker function - exercises real tools/oracle."""
 
     def test_import_variable_detected_as_executing(self, tmp_path):
         """Dynamic-import rule: import(variable) should be detected as executing."""
-        test_script = self._create_oracle_script_with_marker(tmp_path)
+        repo = tmp_path / "repo"
+        (repo / "tools").mkdir(parents=True)
+        (repo / "schema").mkdir(parents=True)
+        shutil.copy2(ORACLE_SCRIPT, repo / "tools" / "oracle")
+        shutil.copy2(SCHEMA_FILE, repo / "schema" / "case.schema.json")
+
+        mod = load_oracle_module(repo)
 
         check_source = """
 const fs = require('fs');
 const path = process.argv[2];
 import(path).then(m => { ... });
 """
-        result = subprocess.run(
-            [sys.executable, str(test_script)],
-            input=check_source,
-            capture_output=True,
-            text=True,
-            timeout=10,
-            cwd=tmp_path
-        )
-        assert "DETECTED" in result.stdout, f"import(variable) should be detected, got: {result.stdout}"
+        result = mod.has_executing_marker(check_source)
+        assert result is True, f"import(variable) should be detected"
 
     def test_import_literal_string_not_detected(self, tmp_path):
         """Dynamic-import rule: import('./x.mjs') should NOT be detected (it's literal)."""
-        test_script = self._create_oracle_script_with_marker(tmp_path)
+        repo = tmp_path / "repo"
+        (repo / "tools").mkdir(parents=True)
+        (repo / "schema").mkdir(parents=True)
+        shutil.copy2(ORACLE_SCRIPT, repo / "tools" / "oracle")
+        shutil.copy2(SCHEMA_FILE, repo / "schema" / "case.schema.json")
+
+        mod = load_oracle_module(repo)
 
         check_source = """
 const fs = require('fs');
 import('./x.mjs').then(m => { ... });
 """
-        result = subprocess.run(
-            [sys.executable, str(test_script)],
-            input=check_source,
-            capture_output=True,
-            text=True,
-            timeout=10,
-            cwd=tmp_path
-        )
+        result = mod.has_executing_marker(check_source)
         # Literal import with quotes should NOT match the pattern
-        assert "NOT_DETECTED" in result.stdout, f"import('./x.mjs') literal should NOT be detected as dynamic, got: {result.stdout}"
+        assert result is False, f"import('./x.mjs') literal should NOT be detected as dynamic"
 
     def test_vm_runInContext_detected(self, tmp_path):
         """Marker list: vm.runInContext should be detected."""
-        test_script = self._create_oracle_script_with_marker(tmp_path)
+        repo = tmp_path / "repo"
+        (repo / "tools").mkdir(parents=True)
+        (repo / "schema").mkdir(parents=True)
+        shutil.copy2(ORACLE_SCRIPT, repo / "tools" / "oracle")
+        shutil.copy2(SCHEMA_FILE, repo / "schema" / "case.schema.json")
+
+        mod = load_oracle_module(repo)
 
         check_source = """
 const vm = require('vm');
 vm.runInContext('console.log("test")', {});
 """
-        result = subprocess.run(
-            [sys.executable, str(test_script)],
-            input=check_source,
-            capture_output=True,
-            text=True,
-            timeout=10,
-            cwd=tmp_path
-        )
-        assert "DETECTED" in result.stdout
+        result = mod.has_executing_marker(check_source)
+        assert result is True
 
     def test_vm_runInNewContext_detected(self, tmp_path):
         """Marker list: vm.runInNewContext should be detected."""
-        test_script = self._create_oracle_script_with_marker(tmp_path)
+        repo = tmp_path / "repo"
+        (repo / "tools").mkdir(parents=True)
+        (repo / "schema").mkdir(parents=True)
+        shutil.copy2(ORACLE_SCRIPT, repo / "tools" / "oracle")
+        shutil.copy2(SCHEMA_FILE, repo / "schema" / "case.schema.json")
+
+        mod = load_oracle_module(repo)
 
         check_source = """
 const vm = require('vm');
 vm.runInNewContext('console.log("test")', {});
 """
-        result = subprocess.run(
-            [sys.executable, str(test_script)],
-            input=check_source,
-            capture_output=True,
-            text=True,
-            timeout=10,
-            cwd=tmp_path
-        )
-        assert "DETECTED" in result.stdout
+        result = mod.has_executing_marker(check_source)
+        assert result is True
 
     def test_vm_runInThisContext_detected(self, tmp_path):
         """Marker list: vm.runInThisContext should be detected."""
-        test_script = self._create_oracle_script_with_marker(tmp_path)
+        repo = tmp_path / "repo"
+        (repo / "tools").mkdir(parents=True)
+        (repo / "schema").mkdir(parents=True)
+        shutil.copy2(ORACLE_SCRIPT, repo / "tools" / "oracle")
+        shutil.copy2(SCHEMA_FILE, repo / "schema" / "case.schema.json")
+
+        mod = load_oracle_module(repo)
 
         check_source = """
 const vm = require('vm');
 vm.runInThisContext('console.log("test")');
 """
-        result = subprocess.run(
-            [sys.executable, str(test_script)],
-            input=check_source,
-            capture_output=True,
-            text=True,
-            timeout=10,
-            cwd=tmp_path
-        )
-        assert "DETECTED" in result.stdout
+        result = mod.has_executing_marker(check_source)
+        assert result is True
 
     def test_new_vm_Script_detected(self, tmp_path):
         """Marker list: new vm.Script should be detected."""
-        test_script = self._create_oracle_script_with_marker(tmp_path)
+        repo = tmp_path / "repo"
+        (repo / "tools").mkdir(parents=True)
+        (repo / "schema").mkdir(parents=True)
+        shutil.copy2(ORACLE_SCRIPT, repo / "tools" / "oracle")
+        shutil.copy2(SCHEMA_FILE, repo / "schema" / "case.schema.json")
+
+        mod = load_oracle_module(repo)
 
         check_source = """
 const vm = require('vm');
 new vm.Script('console.log("test")');
 """
-        result = subprocess.run(
-            [sys.executable, str(test_script)],
-            input=check_source,
-            capture_output=True,
-            text=True,
-            timeout=10,
-            cwd=tmp_path
-        )
-        assert "DETECTED" in result.stdout
+        result = mod.has_executing_marker(check_source)
+        assert result is True
 
     def test_new_Function_detected(self, tmp_path):
         """Marker list: new Function( should be detected."""
-        test_script = self._create_oracle_script_with_marker(tmp_path)
+        repo = tmp_path / "repo"
+        (repo / "tools").mkdir(parents=True)
+        (repo / "schema").mkdir(parents=True)
+        shutil.copy2(ORACLE_SCRIPT, repo / "tools" / "oracle")
+        shutil.copy2(SCHEMA_FILE, repo / "schema" / "case.schema.json")
+
+        mod = load_oracle_module(repo)
 
         check_source = """
 const fn = new Function('console.log("test")');
 """
-        result = subprocess.run(
-            [sys.executable, str(test_script)],
-            input=check_source,
-            capture_output=True,
-            text=True,
-            timeout=10,
-            cwd=tmp_path
-        )
-        assert "DETECTED" in result.stdout
+        result = mod.has_executing_marker(check_source)
+        assert result is True
 
     def test_eval_detected(self, tmp_path):
         """Marker list: eval( should be detected."""
-        test_script = self._create_oracle_script_with_marker(tmp_path)
+        repo = tmp_path / "repo"
+        (repo / "tools").mkdir(parents=True)
+        (repo / "schema").mkdir(parents=True)
+        shutil.copy2(ORACLE_SCRIPT, repo / "tools" / "oracle")
+        shutil.copy2(SCHEMA_FILE, repo / "schema" / "case.schema.json")
+
+        mod = load_oracle_module(repo)
 
         check_source = """
 eval('console.log("test")');
 """
-        result = subprocess.run(
-            [sys.executable, str(test_script)],
-            input=check_source,
-            capture_output=True,
-            text=True,
-            timeout=10,
-            cwd=tmp_path
-        )
-        assert "DETECTED" in result.stdout
+        result = mod.has_executing_marker(check_source)
+        assert result is True
 
     def test_no_executing_marker_rejected(self, tmp_path):
         """Non-executing check (no markers) should be rejected."""
-        test_script = self._create_oracle_script_with_marker(tmp_path)
+        repo = tmp_path / "repo"
+        (repo / "tools").mkdir(parents=True)
+        (repo / "schema").mkdir(parents=True)
+        shutil.copy2(ORACLE_SCRIPT, repo / "tools" / "oracle")
+        shutil.copy2(SCHEMA_FILE, repo / "schema" / "case.schema.json")
+
+        mod = load_oracle_module(repo)
 
         check_source = """
 const fs = require('fs');
@@ -3038,121 +3015,126 @@ if (source.includes('expected')) {
     console.log('found');
 }
 """
-        result = subprocess.run(
-            [sys.executable, str(test_script)],
-            input=check_source,
-            capture_output=True,
-            text=True,
-            timeout=10,
-            cwd=tmp_path
-        )
-        assert "NOT_DETECTED" in result.stdout
+        result = mod.has_executing_marker(check_source)
+        assert result is False
+
+    def test_literal_import_single_quotes(self, tmp_path):
+        """Literal import with single quotes should NOT be detected."""
+        repo = tmp_path / "repo"
+        (repo / "tools").mkdir(parents=True)
+        (repo / "schema").mkdir(parents=True)
+        shutil.copy2(ORACLE_SCRIPT, repo / "tools" / "oracle")
+        shutil.copy2(SCHEMA_FILE, repo / "schema" / "case.schema.json")
+
+        mod = load_oracle_module(repo)
+
+        check_source = """
+import('./x.mjs').then(m => { ... });
+"""
+        result = mod.has_executing_marker(check_source)
+        assert result is False
+
+    def test_literal_import_double_quotes(self, tmp_path):
+        """Literal import with double quotes should NOT be detected."""
+        repo = tmp_path / "repo"
+        (repo / "tools").mkdir(parents=True)
+        (repo / "schema").mkdir(parents=True)
+        shutil.copy2(ORACLE_SCRIPT, repo / "tools" / "oracle")
+        shutil.copy2(SCHEMA_FILE, repo / "schema" / "case.schema.json")
+
+        mod = load_oracle_module(repo)
+
+        check_source = """
+import("./x.mjs").then(m => { ... });
+"""
+        result = mod.has_executing_marker(check_source)
+        assert result is False
+
+    def test_import_with_variable(self, tmp_path):
+        """Dynamic import with variable path should be detected."""
+        repo = tmp_path / "repo"
+        (repo / "tools").mkdir(parents=True)
+        (repo / "schema").mkdir(parents=True)
+        shutil.copy2(ORACLE_SCRIPT, repo / "tools" / "oracle")
+        shutil.copy2(SCHEMA_FILE, repo / "schema" / "case.schema.json")
+
+        mod = load_oracle_module(repo)
+
+        check_source = """
+const path = "./module.js";
+import(path).then(m => { ... });
+"""
+        result = mod.has_executing_marker(check_source)
+        assert result is True
 
 
 class TestClassifyMutantFailure:
-    """Unit tests for classify_mutant_failure function via throwaway repo."""
-
-    def _create_classifier_script(self, tmp_path):
-        """Create a test script that implements classify_mutant_failure."""
-        repo = tmp_path / "repo"
-        (repo / "tools").mkdir(parents=True)
-
-        test_script = repo / "tools" / "test_classifier.py"
-        test_script.write_text("""
-import sys
-import json
-
-def classify_mutant_failure(result):
-    exit_code = result.get("exit_code", 0)
-    reason = result.get("reason", "")
-    error = result.get("error", "")
-
-    # Structural indicators
-    if exit_code == 2:
-        return "structural"
-
-    reason_lower = (reason + error).lower()
-    if "not found" in reason_lower or "unexpected structure" in reason_lower:
-        return "structural"
-
-    return "behavioral"
-
-# Read result from stdin
-result = json.loads(sys.stdin.read())
-classification = classify_mutant_failure(result)
-print(classification)
-""")
-        return test_script
+    """Unit tests for classify_mutant_failure function - exercises real tools/oracle."""
 
     def test_exit_code_2_structural(self, tmp_path):
         """classify_mutant_failure: exit_code == 2 -> structural."""
-        test_script = self._create_classifier_script(tmp_path)
+        repo = tmp_path / "repo"
+        (repo / "tools").mkdir(parents=True)
+        (repo / "schema").mkdir(parents=True)
+        shutil.copy2(ORACLE_SCRIPT, repo / "tools" / "oracle")
+        shutil.copy2(SCHEMA_FILE, repo / "schema" / "case.schema.json")
 
-        result = subprocess.run(
-            [sys.executable, str(test_script)],
-            input=json.dumps({"exit_code": 2, "reason": ""}),
-            capture_output=True,
-            text=True,
-            timeout=10,
-            cwd=tmp_path
-        )
-        assert "structural" in result.stdout
+        mod = load_oracle_module(repo)
+
+        result = mod.classify_mutant_failure({"exit_code": 2, "reason": "some reason"})
+        assert result == "structural"
 
     def test_not_found_substring_structural(self, tmp_path):
         """classify_mutant_failure: 'not found' substring -> structural."""
-        test_script = self._create_classifier_script(tmp_path)
+        repo = tmp_path / "repo"
+        (repo / "tools").mkdir(parents=True)
+        (repo / "schema").mkdir(parents=True)
+        shutil.copy2(ORACLE_SCRIPT, repo / "tools" / "oracle")
+        shutil.copy2(SCHEMA_FILE, repo / "schema" / "case.schema.json")
 
-        result = subprocess.run(
-            [sys.executable, str(test_script)],
-            input=json.dumps({"exit_code": 1, "reason": "file not found", "error": ""}),
-            capture_output=True,
-            text=True,
-            timeout=10,
-            cwd=tmp_path
-        )
-        assert "structural" in result.stdout
+        mod = load_oracle_module(repo)
+
+        result = mod.classify_mutant_failure({"exit_code": 1, "reason": "file not found", "error": ""})
+        assert result == "structural"
 
     def test_unexpected_structure_substring_structural(self, tmp_path):
         """classify_mutant_failure: 'unexpected structure' substring -> structural."""
-        test_script = self._create_classifier_script(tmp_path)
+        repo = tmp_path / "repo"
+        (repo / "tools").mkdir(parents=True)
+        (repo / "schema").mkdir(parents=True)
+        shutil.copy2(ORACLE_SCRIPT, repo / "tools" / "oracle")
+        shutil.copy2(SCHEMA_FILE, repo / "schema" / "case.schema.json")
 
-        result = subprocess.run(
-            [sys.executable, str(test_script)],
-            input=json.dumps({"exit_code": 1, "reason": "unexpected structure in response", "error": ""}),
-            capture_output=True,
-            text=True,
-            timeout=10,
-            cwd=tmp_path
-        )
-        assert "structural" in result.stdout
+        mod = load_oracle_module(repo)
+
+        result = mod.classify_mutant_failure({"exit_code": 1, "reason": "unexpected structure in response", "error": ""})
+        assert result == "structural"
 
     def test_exit_code_1_other_reason_behavioral(self, tmp_path):
         """classify_mutant_failure: exit_code 1 with unrelated reason -> behavioral."""
-        test_script = self._create_classifier_script(tmp_path)
+        repo = tmp_path / "repo"
+        (repo / "tools").mkdir(parents=True)
+        (repo / "schema").mkdir(parents=True)
+        shutil.copy2(ORACLE_SCRIPT, repo / "tools" / "oracle")
+        shutil.copy2(SCHEMA_FILE, repo / "schema" / "case.schema.json")
 
-        result = subprocess.run(
-            [sys.executable, str(test_script)],
-            input=json.dumps({"exit_code": 1, "reason": "assertion failed: expected 42, got 43"}),
-            capture_output=True,
-            text=True,
-            timeout=10,
-            cwd=tmp_path
-        )
-        assert "behavioral" in result.stdout
+        mod = load_oracle_module(repo)
+
+        result = mod.classify_mutant_failure({"exit_code": 1, "reason": "assertion failed: expected 42, got 43"})
+        assert result == "behavioral"
 
     def test_control_behavioral(self, tmp_path):
         """Control: other structural indicators should not trigger behavioral."""
-        test_script = self._create_classifier_script(tmp_path)
+        repo = tmp_path / "repo"
+        (repo / "tools").mkdir(parents=True)
+        (repo / "schema").mkdir(parents=True)
+        shutil.copy2(ORACLE_SCRIPT, repo / "tools" / "oracle")
+        shutil.copy2(SCHEMA_FILE, repo / "schema" / "case.schema.json")
 
-        result = subprocess.run(
-            [sys.executable, str(test_script)],
-            input=json.dumps({"exit_code": 1, "reason": "test failed", "error": "some other error"}),
-            capture_output=True,
-            text=True,
-            timeout=10,
-            cwd=tmp_path
-        )
-        assert "behavioral" in result.stdout
+        mod = load_oracle_module(repo)
+
+        result = mod.classify_mutant_failure({"exit_code": 1, "reason": "test failed", "error": "some other error"})
+        assert result == "behavioral"
 
 
 class TestLintNoExec:
