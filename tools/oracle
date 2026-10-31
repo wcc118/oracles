@@ -175,8 +175,8 @@ def load_manifest(case_id):
 
     task_path = CASES_DIR / case_id / "task.md"
     check_path = CASES_DIR / case_id / "oracle" / "check.mjs"
-    if not task_path.exists():
-        task_path = CASES_DIR / case_id / "oracle" / "check.py"
+    if not check_path.exists():
+        check_path = CASES_DIR / case_id / "oracle" / "check.py"
 
     if task_hash:
         actual_task = hash_file(task_path)

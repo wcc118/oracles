@@ -803,3 +803,777 @@ class TestIntegration:
         assert "--fix" in result.stdout
         assert "--mutant" in result.stdout
         assert "--write" in result.stdout
+
+
+class TestHashMismatch:
+    """Tests for hash mismatch detection (criterion 2)."""
+
+    def test_hash_mismatch_tampered_task_md(self, tmp_path):
+        """Test hash mismatch on tampered task.md returns exit 2 with case and file name."""
+        case_dir = tmp_path / "cases" / "hash-test-task"
+        case_dir.mkdir(parents=True)
+        oracle_dir = case_dir / "oracle"
+        oracle_dir.mkdir()
+
+        check_file = oracle_dir / "check.mjs"
+        check_file.write_text("console.log(JSON.stringify({ok:false, reason:'fail'}));")
+
+        task_file = case_dir / "task.md"
+        task_file.write_text("# Task")
+
+        task_hash = hash_file(task_file)
+        check_hash = hash_file(check_file)
+
+        manifest = {
+            "id": "hash-test-task",
+            "task_class": "test",
+            "runtime": "node-vm",
+            "strength": "invariant-or-residual",
+            "status": "probation",
+            "suite": "tuning",
+            "hashes": {
+                "input": "abc",
+                "task": task_hash,
+                "check": check_hash
+            },
+            "origin": {"issue": "test"}
+        }
+        (case_dir / "manifest.json").write_text(json.dumps(manifest))
+
+        dest_case = CASES_DIR / "hash-test-task"
+        if dest_case.exists():
+            shutil.rmtree(dest_case)
+        shutil.copytree(case_dir, dest_case)
+
+        try:
+            # Tamper with task.md AFTER copy - modify dest_case version
+            dest_task = dest_case / "task.md"
+            dest_task.write_text("# Tampered task")
+
+            result = run_oracle("run", "hash-test-task", str(tmp_path / "ws"), check=False)
+            assert result.returncode == 2
+            assert "hash-test-task" in result.stderr
+            assert "task.md" in result.stderr
+            assert "hash mismatch" in result.stderr.lower()
+        finally:
+            if dest_case.exists():
+                shutil.rmtree(dest_case)
+
+    def test_hash_mismatch_tampered_check_file(self, tmp_path):
+        """Test hash mismatch on tampered oracle/check.* returns exit 2 with case and check file name."""
+        case_dir = tmp_path / "cases" / "hash-test-check"
+        case_dir.mkdir(parents=True)
+        oracle_dir = case_dir / "oracle"
+        oracle_dir.mkdir()
+
+        check_file = oracle_dir / "check.mjs"
+        check_file.write_text("console.log(JSON.stringify({ok:false, reason:'fail'}));")
+
+        task_file = case_dir / "task.md"
+        task_file.write_text("# Task")
+
+        task_hash = hash_file(task_file)
+        check_hash = hash_file(check_file)
+
+        manifest = {
+            "id": "hash-test-check",
+            "task_class": "test",
+            "runtime": "node-vm",
+            "strength": "invariant-or-residual",
+            "status": "probation",
+            "suite": "tuning",
+            "hashes": {
+                "input": "abc",
+                "task": task_hash,
+                "check": check_hash
+            },
+            "origin": {"issue": "test"}
+        }
+        (case_dir / "manifest.json").write_text(json.dumps(manifest))
+
+        dest_case = CASES_DIR / "hash-test-check"
+        if dest_case.exists():
+            shutil.rmtree(dest_case)
+        shutil.copytree(case_dir, dest_case)
+
+        try:
+            # Tamper with check file AFTER copy - modify dest_case version
+            dest_check = dest_case / "oracle" / "check.mjs"
+            dest_check.write_text("console.log(JSON.stringify({ok:true, reason:'tampered'}));")
+
+            result = run_oracle("run", "hash-test-check", str(tmp_path / "ws"), check=False)
+            assert result.returncode == 2
+            assert "hash-test-check" in result.stderr
+            assert "check" in result.stderr.lower()
+            assert "hash mismatch" in result.stderr.lower()
+        finally:
+            if dest_case.exists():
+                shutil.rmtree(dest_case)
+
+    def test_hash_mismatch_untampered_copy_normal_result(self, tmp_path):
+        """Test untampered copy of case works normally (exit 0 for pass, exit 1 for fail)."""
+        case_dir = tmp_path / "cases" / "hash-test-clean"
+        case_dir.mkdir(parents=True)
+        oracle_dir = case_dir / "oracle"
+        oracle_dir.mkdir()
+
+        check_file = oracle_dir / "check.mjs"
+        check_file.write_text("console.log(JSON.stringify({ok:false, reason:'fail'})); process.exit(1);")
+
+        task_file = case_dir / "task.md"
+        task_file.write_text("# Task")
+
+        task_hash = hash_file(task_file)
+        check_hash = hash_file(check_file)
+
+        manifest = {
+            "id": "hash-test-clean",
+            "task_class": "test",
+            "runtime": "node-vm",
+            "strength": "invariant-or-residual",
+            "status": "probation",
+            "suite": "tuning",
+            "hashes": {
+                "input": "abc",
+                "task": task_hash,
+                "check": check_hash
+            },
+            "origin": {"issue": "test"}
+        }
+        (case_dir / "manifest.json").write_text(json.dumps(manifest))
+
+        dest_case = CASES_DIR / "hash-test-clean"
+        if dest_case.exists():
+            shutil.rmtree(dest_case)
+        shutil.copytree(case_dir, dest_case)
+
+        try:
+            # No tampering - run should work
+            ws = tmp_path / "ws"
+            ws.mkdir()
+            (ws / "test.txt").write_text("content")
+
+            result = run_oracle("run", "hash-test-clean", str(ws), check=False)
+            # Check returns ok:false, so exit should be 1
+            assert result.returncode == 1
+            output = json.loads(result.stdout)
+            assert output.get("ok") is False
+            assert output.get("case") == "hash-test-clean"
+        finally:
+            if dest_case.exists():
+                shutil.rmtree(dest_case)
+
+
+class TestLeakcheckRegularFileCopies:
+    """Tests for leakcheck on REGULAR-FILE copies (criterion 5)."""
+
+    def test_leakcheck_identical_copy_in_workspace_different_name(self, tmp_path):
+        """Test leakcheck detects byte-identical copy of check file under different name -> exit 1."""
+        oracle_file = CASES_DIR / "264-root-reaction-sign" / "oracle" / "check.mjs"
+        ws_dir = tmp_path / "workspace"
+        ws_dir.mkdir()
+        # Place identical copy with different name in workspace
+        copy_file = ws_dir / "different_name.mjs"
+        copy_file.write_bytes(oracle_file.read_bytes())
+
+        result = run_oracle("leakcheck", str(ws_dir))
+        assert result.returncode == 1
+        assert "identical" in result.stdout.lower()
+        assert str(copy_file) in result.stdout
+
+    def test_leakcheck_identical_copy_nested_two_directories(self, tmp_path):
+        """Test leakcheck detects identical copy nested two directories deep -> exit 1."""
+        oracle_file = CASES_DIR / "264-root-reaction-sign" / "oracle" / "check.mjs"
+        ws_dir = tmp_path / "workspace"
+        ws_dir.mkdir()
+        nested_dir = ws_dir / "level1" / "level2"
+        nested_dir.mkdir(parents=True)
+        # Place identical copy at nested path
+        copy_file = nested_dir / "check.mjs"
+        copy_file.write_bytes(oracle_file.read_bytes())
+
+        result = run_oracle("leakcheck", str(ws_dir))
+        assert result.returncode == 1
+        assert "identical" in result.stdout.lower()
+        assert str(copy_file) in result.stdout
+
+    def test_leakcheck_identical_copy_validation_report(self, tmp_path):
+        """Test leakcheck detects byte-identical copy of validation/report.json -> exit 1."""
+        # Use 264 validation/report.json if it exists, otherwise use a created one
+        validation_dir = CASES_DIR / "264-root-reaction-sign" / "validation"
+        validation_dir.mkdir(exist_ok=True)
+        report_file = validation_dir / "report.json"
+        if not report_file.exists():
+            report_file.write_text(json.dumps({"timestamp": "test", "verdict": True}))
+
+        ws_dir = tmp_path / "workspace"
+        ws_dir.mkdir()
+        copy_file = ws_dir / "report.json"
+        copy_file.write_bytes(report_file.read_bytes())
+
+        result = run_oracle("leakcheck", str(ws_dir))
+        assert result.returncode == 1
+        assert "identical" in result.stdout.lower()
+        assert str(copy_file) in result.stdout
+
+    def test_leakcheck_copy_with_one_extra_byte_appended_exit_0(self, tmp_path):
+        """Test leakcheck on copy with one extra byte appended -> exit 0 (accepted limitation)."""
+        oracle_file = CASES_DIR / "264-root-reaction-sign" / "oracle" / "check.mjs"
+        ws_dir = tmp_path / "workspace"
+        ws_dir.mkdir()
+        # Copy with one extra byte appended
+        copy_file = ws_dir / "check.mjs"
+        copy_file.write_bytes(oracle_file.read_bytes() + b"x")
+
+        result = run_oracle("leakcheck", str(ws_dir))
+        assert result.returncode == 0
+        assert "PASSED" in result.stdout
+
+
+class TestValidateExpectationViolations:
+    """Tests for validate expectation violations (criterion 4)."""
+
+    def test_validate_raw_workspace_passes_exit_1(self, tmp_path):
+        """Test validate with raw workspace that PASSES -> exit 1, says raw must fail."""
+        # Create a minimal fake case for python runtime
+        case_dir = tmp_path / "cases" / "validate-raw-pass"
+        case_dir.mkdir(parents=True)
+        oracle_dir = case_dir / "oracle"
+        oracle_dir.mkdir()
+
+        check_file = oracle_dir / "check.py"
+        check_file.write_text("""
+import json
+import os
+import sys
+
+workspace = sys.argv[1] if len(sys.argv) > 1 else "."
+# This check ALWAYS passes - this is the bug we're testing
+print(json.dumps({"ok": True}))
+""")
+
+        task_file = case_dir / "task.md"
+        task_file.write_text("# Test task")
+
+        task_hash = hash_file(task_file)
+        check_hash = hash_file(check_file)
+
+        manifest = {
+            "id": "validate-raw-pass",
+            "task_class": "test",
+            "runtime": "python",
+            "strength": "invariant-or-residual",
+            "status": "probation",
+            "suite": "tuning",
+            "hashes": {
+                "input": "abc",
+                "task": task_hash,
+                "check": check_hash
+            },
+            "origin": {"issue": "test"}
+        }
+        (case_dir / "manifest.json").write_text(json.dumps(manifest))
+
+        dest_case = CASES_DIR / "validate-raw-pass"
+        if dest_case.exists():
+            shutil.rmtree(dest_case)
+        shutil.copytree(case_dir, dest_case)
+
+        try:
+            raw_dir = tmp_path / "raw"
+            raw_dir.mkdir()
+            (raw_dir / "test.txt").write_text("content")
+
+            fix_dir = tmp_path / "fix"
+            fix_dir.mkdir()
+            (fix_dir / "test.txt").write_text("content")
+
+            result = run_oracle("validate", "validate-raw-pass",
+                               "--raw", str(raw_dir), "--fix", str(fix_dir), check=False)
+            assert result.returncode == 1
+            assert "raw" in result.stdout
+            assert "must fail" in result.stdout or "expected exit 1" in result.stdout
+        finally:
+            if dest_case.exists():
+                shutil.rmtree(dest_case)
+
+    def test_validate_fix_workspace_fails_exit_1(self, tmp_path):
+        """Test validate with fix workspace that FAILS -> exit 1, says fix must pass."""
+        case_dir = tmp_path / "cases" / "validate-fix-fail"
+        case_dir.mkdir(parents=True)
+        oracle_dir = case_dir / "oracle"
+        oracle_dir.mkdir()
+
+        check_file = oracle_dir / "check.py"
+        check_file.write_text("""
+import json
+import os
+import sys
+
+workspace = sys.argv[1] if len(sys.argv) > 1 else "."
+test_file = os.path.join(workspace, "test.txt")
+content = open(test_file).read() if os.path.exists(test_file) else ""
+# Pass on raw, fail on fix - this is the bug: fix workspace should pass
+if "raw" in os.path.basename(workspace):
+    print(json.dumps({"ok": True, "reason": "raw passed"}))
+    sys.exit(0)
+else:
+    print(json.dumps({"ok": False, "reason": "fix failed - BUG"}))
+    sys.exit(1)
+""")
+
+        task_file = case_dir / "task.md"
+        task_file.write_text("# Test task")
+
+        task_hash = hash_file(task_file)
+        check_hash = hash_file(check_file)
+
+        manifest = {
+            "id": "validate-fix-fail",
+            "task_class": "test",
+            "runtime": "python",
+            "strength": "invariant-or-residual",
+            "status": "probation",
+            "suite": "tuning",
+            "hashes": {
+                "input": "abc",
+                "task": task_hash,
+                "check": check_hash
+            },
+            "origin": {"issue": "test"}
+        }
+        (case_dir / "manifest.json").write_text(json.dumps(manifest))
+
+        dest_case = CASES_DIR / "validate-fix-fail"
+        if dest_case.exists():
+            shutil.rmtree(dest_case)
+        shutil.copytree(case_dir, dest_case)
+
+        try:
+            raw_dir = tmp_path / "raw"
+            raw_dir.mkdir()
+            (raw_dir / "test.txt").write_text("content")
+
+            fix_dir = tmp_path / "fix"
+            fix_dir.mkdir()
+            (fix_dir / "test.txt").write_text("content")
+
+            result = run_oracle("validate", "validate-fix-fail",
+                               "--raw", str(raw_dir), "--fix", str(fix_dir), check=False)
+            assert result.returncode == 1
+            assert "fix" in result.stdout
+            assert "must pass" in result.stdout or "expected exit 0" in result.stdout
+        finally:
+            if dest_case.exists():
+                shutil.rmtree(dest_case)
+
+    def test_validate_mutant_workspace_passes_exit_1(self, tmp_path):
+        """Test validate with mutant workspace that PASSES -> exit 1 naming that mutant."""
+        case_dir = tmp_path / "cases" / "validate-mutant-pass"
+        case_dir.mkdir(parents=True)
+        oracle_dir = case_dir / "oracle"
+        oracle_dir.mkdir()
+
+        check_file = oracle_dir / "check.py"
+        check_file.write_text("""
+import json
+import os
+import sys
+
+workspace = sys.argv[1] if len(sys.argv) > 1 else "."
+# This check fails on raw/fix but passes on mutant
+test_file = os.path.join(workspace, "test.txt")
+if os.path.exists(test_file):
+    content = open(test_file).read()
+    if "mutant_marker" in content:
+        print(json.dumps({"ok": True, "reason": "mutant passes"}))
+    else:
+        print(json.dumps({"ok": False, "reason": "raw/fix fails"}))
+else:
+    print(json.dumps({"ok": False, "reason": "no test file"}))
+""")
+
+        task_file = case_dir / "task.md"
+        task_file.write_text("# Test task")
+
+        task_hash = hash_file(task_file)
+        check_hash = hash_file(check_file)
+
+        manifest = {
+            "id": "validate-mutant-pass",
+            "task_class": "test",
+            "runtime": "python",
+            "strength": "invariant-or-residual",
+            "status": "probation",
+            "suite": "tuning",
+            "hashes": {
+                "input": "abc",
+                "task": task_hash,
+                "check": check_hash
+            },
+            "origin": {"issue": "test"}
+        }
+        (case_dir / "manifest.json").write_text(json.dumps(manifest))
+
+        dest_case = CASES_DIR / "validate-mutant-pass"
+        if dest_case.exists():
+            shutil.rmtree(dest_case)
+        shutil.copytree(case_dir, dest_case)
+
+        try:
+            raw_dir = tmp_path / "raw"
+            raw_dir.mkdir()
+            (raw_dir / "test.txt").write_text("content")
+
+            fix_dir = tmp_path / "fix"
+            fix_dir.mkdir()
+            (fix_dir / "test.txt").write_text("content")
+
+            mutant_dir = tmp_path / "mutant"
+            mutant_dir.mkdir()
+            (mutant_dir / "test.txt").write_text("content mutant_marker")
+
+            result = run_oracle("validate", "validate-mutant-pass",
+                               "--raw", str(raw_dir), "--fix", str(fix_dir),
+                               "--mutant", f"badmutant={mutant_dir}", check=False)
+            assert result.returncode == 1
+            assert "badmutant" in result.stdout
+        finally:
+            if dest_case.exists():
+                shutil.rmtree(dest_case)
+
+    def test_validate_fewer_than_two_mutants_exit_1(self, tmp_path):
+        """Test validate with fewer than two mutants -> exit 1."""
+        case_dir = tmp_path / "cases" / "validate-few-mutants"
+        case_dir.mkdir(parents=True)
+        oracle_dir = case_dir / "oracle"
+        oracle_dir.mkdir()
+
+        check_file = oracle_dir / "check.py"
+        check_file.write_text("""
+import json
+import os
+import sys
+
+print(json.dumps({"ok": False, "reason": "default fail"}))
+""")
+
+        task_file = case_dir / "task.md"
+        task_file.write_text("# Test task")
+
+        task_hash = hash_file(task_file)
+        check_hash = hash_file(check_file)
+
+        manifest = {
+            "id": "validate-few-mutants",
+            "task_class": "test",
+            "runtime": "python",
+            "strength": "invariant-or-residual",
+            "status": "probation",
+            "suite": "tuning",
+            "hashes": {
+                "input": "abc",
+                "task": task_hash,
+                "check": check_hash
+            },
+            "origin": {"issue": "test"}
+        }
+        (case_dir / "manifest.json").write_text(json.dumps(manifest))
+
+        dest_case = CASES_DIR / "validate-few-mutants"
+        if dest_case.exists():
+            shutil.rmtree(dest_case)
+        shutil.copytree(case_dir, dest_case)
+
+        try:
+            raw_dir = tmp_path / "raw"
+            raw_dir.mkdir()
+            (raw_dir / "test.txt").write_text("content")
+
+            fix_dir = tmp_path / "fix"
+            fix_dir.mkdir()
+            (fix_dir / "test.txt").write_text("content")
+
+            # Only one mutant - should fail
+            mutant_dir = tmp_path / "mutant"
+            mutant_dir.mkdir()
+            (mutant_dir / "test.txt").write_text("content")
+
+            result = run_oracle("validate", "validate-few-mutants",
+                               "--raw", str(raw_dir), "--fix", str(fix_dir),
+                               "--mutant", f"mut1={mutant_dir}", check=False)
+            assert result.returncode == 1
+            assert "at least 2" in result.stdout or "mutants" in result.stdout
+        finally:
+            if dest_case.exists():
+                shutil.rmtree(dest_case)
+
+    def test_validate_all_expectations_met_exit_0_write_report(self, tmp_path):
+        """Test validate with all expectations met -> exit 0 and report.json written."""
+        case_dir = tmp_path / "cases" / "validate-all-pass"
+        case_dir.mkdir(parents=True)
+        oracle_dir = case_dir / "oracle"
+        oracle_dir.mkdir()
+
+        check_file = oracle_dir / "check.py"
+        check_file.write_text("""
+import json
+import os
+import sys
+
+workspace = sys.argv[1] if len(sys.argv) > 1 else "."
+test_file = os.path.join(workspace, "test.txt")
+content = open(test_file).read() if os.path.exists(test_file) else ""
+if "fail" in content:
+    print(json.dumps({"ok": False, "reason": "failed as expected"}))
+    sys.exit(1)
+else:
+    print(json.dumps({"ok": True, "reason": "passed as expected"}))
+    sys.exit(0)
+""")
+
+        task_file = case_dir / "task.md"
+        task_file.write_text("# Test task")
+
+        task_hash = hash_file(task_file)
+        check_hash = hash_file(check_file)
+
+        manifest = {
+            "id": "validate-all-pass",
+            "task_class": "test",
+            "runtime": "python",
+            "strength": "invariant-or-residual",
+            "status": "probation",
+            "suite": "tuning",
+            "hashes": {
+                "input": "abc",
+                "task": task_hash,
+                "check": check_hash
+            },
+            "origin": {"issue": "test"}
+        }
+        (case_dir / "manifest.json").write_text(json.dumps(manifest))
+
+        dest_case = CASES_DIR / "validate-all-pass"
+        if dest_case.exists():
+            shutil.rmtree(dest_case)
+        shutil.copytree(case_dir, dest_case)
+
+        try:
+            raw_dir = tmp_path / "raw"
+            raw_dir.mkdir()
+            (raw_dir / "test.txt").write_text("content fail")
+
+            fix_dir = tmp_path / "fix"
+            fix_dir.mkdir()
+            (fix_dir / "test.txt").write_text("content")
+
+            # Create two mutants that fail
+            mut1_dir = tmp_path / "mut1"
+            mut1_dir.mkdir()
+            (mut1_dir / "test.txt").write_text("content fail")
+
+            mut2_dir = tmp_path / "mut2"
+            mut2_dir.mkdir()
+            (mut2_dir / "test.txt").write_text("content fail")
+
+            # Get manifest hash before write
+            manifest_path = CASES_DIR / "validate-all-pass" / "manifest.json"
+            manifest_hash_before = hash_file(manifest_path)
+
+            result = run_oracle("validate", "validate-all-pass",
+                               "--raw", str(raw_dir), "--fix", str(fix_dir),
+                               "--mutant", f"mut1={mut1_dir}",
+                               "--mutant", f"mut2={mut2_dir}", "--write", check=False)
+            assert result.returncode == 0
+
+            # Check report.json was written
+            validation_dir = CASES_DIR / "validate-all-pass" / "validation"
+            report_file = validation_dir / "report.json"
+            assert report_file.exists(), "report.json not written"
+
+            # Check manifest.json is unchanged
+            manifest_hash_after = hash_file(manifest_path)
+            assert manifest_hash_after == manifest_hash_before, "manifest.json was modified"
+        finally:
+            if dest_case.exists():
+                shutil.rmtree(dest_case)
+
+
+class TestPythonRuntimeDispatch:
+    """Tests for python runtime dispatch (criterion 3)."""
+
+    def test_python_runtime_dispatch(self, tmp_path):
+        """Test python runtime with check.py passes through JSON and exit code 0/1/2."""
+        case_dir = tmp_path / "cases" / "python-runtime-test"
+        case_dir.mkdir(parents=True)
+        oracle_dir = case_dir / "oracle"
+        oracle_dir.mkdir()
+
+        check_file = oracle_dir / "check.py"
+        check_file.write_text("""
+import json
+import sys
+
+# Simple pass check
+print(json.dumps({"ok": True, "message": "success"}))
+""")
+
+        task_file = case_dir / "task.md"
+        task_file.write_text("# Test task")
+
+        task_hash = hash_file(task_file)
+        check_hash = hash_file(check_file)
+
+        manifest = {
+            "id": "python-runtime-test",
+            "task_class": "test",
+            "runtime": "python",
+            "strength": "invariant-or-residual",
+            "status": "probation",
+            "suite": "tuning",
+            "hashes": {
+                "input": "abc",
+                "task": task_hash,
+                "check": check_hash
+            },
+            "origin": {"issue": "test"}
+        }
+        (case_dir / "manifest.json").write_text(json.dumps(manifest))
+
+        dest_case = CASES_DIR / "python-runtime-test"
+        if dest_case.exists():
+            shutil.rmtree(dest_case)
+        shutil.copytree(case_dir, dest_case)
+
+        try:
+            ws = tmp_path / "ws"
+            ws.mkdir()
+            (ws / "test.txt").write_text("content")
+
+            result = run_oracle("run", "python-runtime-test", str(ws))
+            assert result.returncode == 0
+            output = json.loads(result.stdout)
+            assert output.get("ok") is True
+            assert output.get("case") == "python-runtime-test"
+            assert output.get("runtime") == "python"
+            assert output.get("strength") == "invariant-or-residual"
+            assert output.get("status") == "probation"
+            assert "commit" in output
+        finally:
+            if dest_case.exists():
+                shutil.rmtree(dest_case)
+
+    def test_python_runtime_exit_1_fail(self, tmp_path):
+        """Test python runtime check that fails returns exit 1."""
+        case_dir = tmp_path / "cases" / "python-runtime-fail"
+        case_dir.mkdir(parents=True)
+        oracle_dir = case_dir / "oracle"
+        oracle_dir.mkdir()
+
+        check_file = oracle_dir / "check.py"
+        check_file.write_text("""
+import json
+import sys
+
+print(json.dumps({"ok": False, "reason": "intentional fail"}))
+sys.exit(1)
+""")
+
+        task_file = case_dir / "task.md"
+        task_file.write_text("# Test task")
+
+        task_hash = hash_file(task_file)
+        check_hash = hash_file(check_file)
+
+        manifest = {
+            "id": "python-runtime-fail",
+            "task_class": "test",
+            "runtime": "python",
+            "strength": "invariant-or-residual",
+            "status": "probation",
+            "suite": "tuning",
+            "hashes": {
+                "input": "abc",
+                "task": task_hash,
+                "check": check_hash
+            },
+            "origin": {"issue": "test"}
+        }
+        (case_dir / "manifest.json").write_text(json.dumps(manifest))
+
+        dest_case = CASES_DIR / "python-runtime-fail"
+        if dest_case.exists():
+            shutil.rmtree(dest_case)
+        shutil.copytree(case_dir, dest_case)
+
+        try:
+            ws = tmp_path / "ws"
+            ws.mkdir()
+            (ws / "test.txt").write_text("content")
+
+            result = run_oracle("run", "python-runtime-fail", str(ws), check=False)
+            assert result.returncode == 1
+            output = json.loads(result.stdout)
+            assert output.get("ok") is False
+            assert output.get("case") == "python-runtime-fail"
+        finally:
+            if dest_case.exists():
+                shutil.rmtree(dest_case)
+
+    def test_python_runtime_exit_2_error(self, tmp_path):
+        """Test python runtime with error returns exit 2."""
+        case_dir = tmp_path / "cases" / "python-runtime-error"
+        case_dir.mkdir(parents=True)
+        oracle_dir = case_dir / "oracle"
+        oracle_dir.mkdir()
+
+        check_file = oracle_dir / "check.py"
+        check_file.write_text("""
+import json
+import sys
+
+print(json.dumps({"ok": False, "error": "runtime error"}))
+sys.exit(2)
+""")
+
+        task_file = case_dir / "task.md"
+        task_file.write_text("# Test task")
+
+        task_hash = hash_file(task_file)
+        check_hash = hash_file(check_file)
+
+        manifest = {
+            "id": "python-runtime-error",
+            "task_class": "test",
+            "runtime": "python",
+            "strength": "invariant-or-residual",
+            "status": "probation",
+            "suite": "tuning",
+            "hashes": {
+                "input": "abc",
+                "task": task_hash,
+                "check": check_hash
+            },
+            "origin": {"issue": "test"}
+        }
+        (case_dir / "manifest.json").write_text(json.dumps(manifest))
+
+        dest_case = CASES_DIR / "python-runtime-error"
+        if dest_case.exists():
+            shutil.rmtree(dest_case)
+        shutil.copytree(case_dir, dest_case)
+
+        try:
+            ws = tmp_path / "ws"
+            ws.mkdir()
+            (ws / "test.txt").write_text("content")
+
+            result = run_oracle("run", "python-runtime-error", str(ws), check=False)
+            assert result.returncode == 2
+            output = json.loads(result.stdout)
+            assert output.get("ok") is False
+            assert output.get("case") == "python-runtime-error"
+        finally:
+            if dest_case.exists():
+                shutil.rmtree(dest_case)
