@@ -1384,7 +1384,7 @@ class TestNoExecLint:
         """Test validate rejects a check that never runs workspace code (no exec markers)."""
         repo = _tmp_repo(tmp_path)
         case = _node_vm_marker_case(repo)
-        
+
         # Create a non-executing check (only text matching)
         case_dir = repo / "cases" / case
         check_file = case_dir / "oracle" / "check.mjs"
@@ -1446,7 +1446,7 @@ out({ok: true}, 0);
         """Test validate rejects a check that uses only text-matching patterns."""
         repo = _tmp_repo(tmp_path)
         case = _node_vm_marker_case(repo)
-        
+
         # Create a text-matching check (has vm.Script but uses includes on source)
         case_dir = repo / "cases" / case
         check_file = case_dir / "oracle" / "check.mjs"
@@ -1513,7 +1513,7 @@ out({ok: true}, 0);
         """Test validate passes a check that actually runs workspace code."""
         repo = _tmp_repo(tmp_path)
         case = _node_vm_marker_case(repo)
-        
+
         # Create an executing check (uses vm.Script and runs workspace code)
         case_dir = repo / "cases" / case
         check_file = case_dir / "oracle" / "check.mjs"
@@ -1649,7 +1649,7 @@ out({ok: true}, 0);
         """Test that seed cases 264 and 267 pass the lint_no_exec check via validate."""
         # Create a simple test that validates these cases
         repo = _tmp_repo(tmp_path)
-        
+
         # Copy the seed cases to our temp repo
         import shutil
         for case_id in ["264-root-reaction-sign", "267-playback-clock"]:
@@ -1657,10 +1657,10 @@ out({ok: true}, 0);
             dest_case = repo / "cases" / case_id
             if src_case.exists():
                 shutil.copytree(src_case, dest_case)
-        
+
         # Create a marker case that expects raw to fail and fix to pass
         case = _node_vm_marker_case(repo)
-        
+
         # Update the check to use seed case content
         case_dir = repo / "cases" / case
         check_file = case_dir / "oracle" / "check.mjs"
@@ -1695,7 +1695,7 @@ if (source.includes('expected_function')) {
     out({ok: false, reason: 'missing expected function'}, 1);
 }
 """)
-        
+
         # Also need to update hash
         check_hash = hash_file(check_file)
         manifest_path = case_dir / "manifest.json"
@@ -1789,7 +1789,7 @@ class TestMutantFailureClassification:
         """Test validate counts 'not found' failures as structural."""
         repo = _tmp_repo(tmp_path)
         case = _node_vm_marker_case(repo)
-        
+
         # Create an executing check with structural failure
         case_dir = repo / "cases" / case
         check_file = case_dir / "oracle" / "check.mjs"
@@ -1804,7 +1804,7 @@ try {
     const sandbox = { console: { log() {} } };
     vm.createContext(sandbox);
     new vm.Script(source).runInContext(sandbox);
-    
+
     if (typeof sandbox.missingFunction === 'undefined') {
         out({ok: false, reason: 'expected function not found'}, 1);
     }
@@ -1850,7 +1850,7 @@ try {
         """Test validate counts actual assertion failures as behavioral."""
         repo = _tmp_repo(tmp_path)
         case = _node_vm_marker_case(repo)
-        
+
         # Create a check that produces behavioral failures
         case_dir = repo / "cases" / case
         check_file = case_dir / "oracle" / "check.mjs"
@@ -1926,12 +1926,12 @@ const out = (r, code) => { console.log(JSON.stringify(r)); process.exit(code); }
 try {
     const testFile = workspace + '/test.txt';
     const content = fs.readFileSync(testFile, 'utf8');
-    
+
     // Execute content in vm (to satisfy lint) but just run a simple script
     const sandbox = { console: { log() {} } };
     vm.createContext(sandbox);
     new vm.Script('console.log("loaded")').runInContext(sandbox);
-    
+
     // This check runs code and asserts on behavior
     if (content.includes('pass')) {
         out({ok: true, reason: 'passed'}, 0);

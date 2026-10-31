@@ -28,7 +28,7 @@ try {
 function makeEnv() {
     let vnow = 1_700_000_000_000, tid = 0;
     const timers = [], elems = new Map();
-    
+
     const mkEl = tag => {
         const e = {
             tag, children: [], attrs: {}, listeners: {}, style: {}, dataset: {}, textContent: '', innerHTML: '',
@@ -43,15 +43,15 @@ function makeEnv() {
         };
         return e;
     };
-    
+
     const document = {
         createElement: mkEl, createTextNode: t => ({ text: String(t) }), body: mkEl('body'),
         getElementById: id => elems.get(id) ?? mkEl('missing'), querySelector: () => null, querySelectorAll: () => [],
         addEventListener() {},
     };
-    
+
     class FakeDate extends Date { static now() { return vnow; } }
-    
+
     const sandbox = {
         document, window: { matchMedia: () => ({ matches: false, addEventListener() {} }), addEventListener() {}, innerWidth: 1200, innerHeight: 800 },
         matchMedia: () => ({ matches: false, addEventListener() {} }),
@@ -63,12 +63,12 @@ function makeEnv() {
         Math, JSON, Object, Array, Number, String, Promise, Error, Map, Set,
     };
     sandbox.globalThis = sandbox;
-    
+
     vm.createContext(sandbox);
-    
+
     // Run the workspace code in the sandbox
     new vm.Script(code, { filename: 'workbench.js' }).runInContext(sandbox, { timeout: 5000 });
-    
+
     // Return the sandbox for access to the executed code
     return { sandbox, elems, advance: async (ms) => {
         const end = vnow + ms;
@@ -89,21 +89,21 @@ function makeEnv() {
 // Call the real functions, set up the scenario, and assert expected behavior
 async function runCheck() {
     const env = makeEnv();
-    
+
     // Check that the workspace function is defined
     if (typeof env.sandbox.cursorPlayer !== 'function') {
         return { ok: false, error: 'cursorPlayer not defined' };
     }
-    
+
     // TODO: Set up your test scenario here
     // - Get references to workspace functions from env.sandbox
     // - Set up the environment (call functions, trigger events)
     // - Verify the expected behavior
-    
+
     // Example test scenario (replace with your actual test):
     // const result = env.sandbox.someFunction(input);
     // if (result !== expected) return { ok: false, reason: 'unexpected result' };
-    
+
     // Return success if all checks pass
     return { ok: true, reason: 'check passed' };
 }
