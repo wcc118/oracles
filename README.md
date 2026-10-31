@@ -85,3 +85,51 @@ python3 tools/oracle ledger
 # Show only repeated signatures
 python3 tools/oracle ledger --repeats
 ```
+
+## Node-VM Check Lint Rules
+
+The `validate` command enforces linting rules on node-vm checks to ensure they actually execute workspace code rather than just text-matching.
+
+### Structural vs Behavioral Execution
+
+A node-vm check must:
+
+1. **Have an executing marker** - any of:
+   - `vm.runInContext(code, sandbox)`
+   - `vm.runInNewContext(code, { ... })`
+   - `vm.runInThisContext(code)`
+   - `new vm.Script(code).runInContext(sandbox)`
+   - `new vm.Script(code).runInNewContext(...)`
+   - `new Function(...)`
+   - `eval(...)`
+   - `import(variablePath)` (dynamic import with a variable/expression, not a string literal)
+
+2. **Not be text-matching** - A check is considered "text-matching" if:
+   - It has 3+ `.includes(`, `.match(`, or `.test(` calls on workspace source
+   - **AND** the workspace source is NOT actually executed by the check
+
+### Text-Matching Detection
+
+The lint rule checks for text-matching by analyzing the check source:
+
+1. Count text pattern calls: `.includes(`, `.match(`, `.test(`
+2. If there are 3+ such calls, check if the workspace source variable is actually executed
+3. If source is read but not executed, the check is flagged as "text-matching"
+4. If source is both read AND executed, the text patterns are acceptable
+
+### Behavioral vs Structural Mutant Failures
+
+When validating with `--write`, the report includes:
+- **structural failures**: exit code 2, or reasons containing "not found" or "unexpected structure"
+- **behavioral failures**: all other failures where `exit_code == 1`
+
+The `>=2 mutants must fail` requirement counts only **behavioral** failures.
+
+### Heuristic Limitations
+
+The lint uses a simple heuristic and can be defeated by:
+
+- Adding unused `eval(` or `new Function(` calls that don't actually execute anything
+- The mutant classification (structural vs behavioral) is a second line of defense
+
+Always ensure your check actually executes workspace code, not just text-matches against it.
