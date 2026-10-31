@@ -34,6 +34,52 @@ def hash_file(path):
     return h.hexdigest()
 
 
+def _tmp_repo(tmp_path):
+    """A throwaway copy of the tool layout, so fake cases never touch the real cases/ directory."""
+    repo = tmp_path / "repo"
+    (repo / "tools").mkdir(parents=True)
+    shutil.copy2(ORACLE_SCRIPT, repo / "tools" / "oracle")
+    (repo / "schema").mkdir()
+    shutil.copy2(SCHEMA_FILE, repo / "schema" / "case.schema.json")
+    (repo / "cases").mkdir()
+    return repo
+
+
+def _marker_case(repo, case_id="marker-case"):
+    """Python-runtime case whose check passes if and only if the workspace contains a file named PASS."""
+    case = repo / "cases" / case_id
+    (case / "oracle").mkdir(parents=True)
+    check = case / "oracle" / "check.py"
+    check.write_text(
+        "import json, os, sys\n"
+        "ok = os.path.exists(os.path.join(sys.argv[1], 'PASS'))\n"
+        "print(json.dumps({'ok': ok}))\n"
+        "sys.exit(0 if ok else 1)\n"
+    )
+    task = case / "task.md"
+    task.write_text("# marker case\n")
+    manifest = {
+        "id": case_id, "task_class": "test", "runtime": "python",
+        "strength": "invariant-or-residual", "status": "probation", "suite": "tuning",
+        "hashes": {"input": "x", "task": hash_file(task), "check": hash_file(check)},
+        "origin": {"issue": "test"},
+    }
+    (case / "manifest.json").write_text(json.dumps(manifest))
+    return case_id
+
+
+def _workspace(tmp_path, name, passes):
+    d = tmp_path / name
+    d.mkdir()
+    (d / ("PASS" if passes else "FAIL")).write_text("x")
+    return d
+
+
+def _run_tmp(repo, *args):
+    return subprocess.run([sys.executable, str(repo / "tools" / "oracle"), *args],
+                          capture_output=True, text=True, timeout=60, cwd=repo)
+
+
 class TestManifestLoading:
     """Tests for manifest loading and validation."""
 
@@ -1033,70 +1079,43 @@ class TestLeakcheckRegularFileCopies:
 class TestValidateExpectationViolations:
     """Tests for validate expectation violations (criterion 4)."""
 
-    def test_validate_raw_workspace_passes_exit_1(self, tmp_path):
-        """Test validate with raw workspace that PASSES -> exit 1, says raw must fail."""
-        # Create a minimal fake case for python runtime
-        case_dir = tmp_path / "cases" / "validate-raw-pass"
-        case_dir.mkdir(parents=True)
-        oracle_dir = case_dir / "oracle"
-        oracle_dir.mkdir()
+    def test_validate_raw_must_fail_is_enforced_on_its_own(self, tmp_path):
+        """Raw passes while two mutants fail: only the raw rule can produce the error."""
+        repo = _tmp_repo(tmp_path)
+        case = _marker_case(repo)
+        raw, fix = _workspace(tmp_path, "raw", True), _workspace(tmp_path, "fix", True)
+        m1, m2 = _workspace(tmp_path, "m1", False), _workspace(tmp_path, "m2", False)
+        result = _run_tmp(repo, "validate", case, "--raw", str(raw), "--fix", str(fix),
+                          "--mutant", f"m1={m1}", "--mutant", f"m2={m2}")
+        assert result.returncode == 1
+        assert "raw: expected exit 1" in result.stdout
+        assert "mutants:" not in result.stdout
+        assert "fix: expected" not in result.stdout
 
-        check_file = oracle_dir / "check.py"
-        check_file.write_text("""
-import json
-import os
-import sys
+    def test_validate_each_mutant_must_fail_on_its_own(self, tmp_path):
+        """Two mutants fail (count rule satisfied) but a third passes: only the per-mutant rule can fire."""
+        repo = _tmp_repo(tmp_path)
+        case = _marker_case(repo)
+        raw, fix = _workspace(tmp_path, "raw", False), _workspace(tmp_path, "fix", True)
+        m1, m2 = _workspace(tmp_path, "m1", False), _workspace(tmp_path, "m2", False)
+        m3 = _workspace(tmp_path, "m3", True)
+        result = _run_tmp(repo, "validate", case, "--raw", str(raw), "--fix", str(fix),
+                          "--mutant", f"m1={m1}", "--mutant", f"m2={m2}", "--mutant", f"m3={m3}")
+        assert result.returncode == 1
+        assert "m3: expected exit 1" in result.stdout
+        assert "mutants: at least 2" not in result.stdout
+        assert "raw: expected" not in result.stdout
 
-workspace = sys.argv[1] if len(sys.argv) > 1 else "."
-# This check ALWAYS passes - this is the bug we're testing
-print(json.dumps({"ok": True}))
-""")
-
-        task_file = case_dir / "task.md"
-        task_file.write_text("# Test task")
-
-        task_hash = hash_file(task_file)
-        check_hash = hash_file(check_file)
-
-        manifest = {
-            "id": "validate-raw-pass",
-            "task_class": "test",
-            "runtime": "python",
-            "strength": "invariant-or-residual",
-            "status": "probation",
-            "suite": "tuning",
-            "hashes": {
-                "input": "abc",
-                "task": task_hash,
-                "check": check_hash
-            },
-            "origin": {"issue": "test"}
-        }
-        (case_dir / "manifest.json").write_text(json.dumps(manifest))
-
-        dest_case = CASES_DIR / "validate-raw-pass"
-        if dest_case.exists():
-            shutil.rmtree(dest_case)
-        shutil.copytree(case_dir, dest_case)
-
-        try:
-            raw_dir = tmp_path / "raw"
-            raw_dir.mkdir()
-            (raw_dir / "test.txt").write_text("content")
-
-            fix_dir = tmp_path / "fix"
-            fix_dir.mkdir()
-            (fix_dir / "test.txt").write_text("content")
-
-            result = run_oracle("validate", "validate-raw-pass",
-                               "--raw", str(raw_dir), "--fix", str(fix_dir), check=False)
-            assert result.returncode == 1
-            assert "raw" in result.stdout
-            assert "must fail" in result.stdout or "expected exit 1" in result.stdout
-        finally:
-            if dest_case.exists():
-                shutil.rmtree(dest_case)
-
+    def test_validate_control_all_expectations_met(self, tmp_path):
+        """Control for the two tests above: the same harness exits 0 when every expectation holds."""
+        repo = _tmp_repo(tmp_path)
+        case = _marker_case(repo)
+        raw, fix = _workspace(tmp_path, "raw", False), _workspace(tmp_path, "fix", True)
+        m1, m2 = _workspace(tmp_path, "m1", False), _workspace(tmp_path, "m2", False)
+        result = _run_tmp(repo, "validate", case, "--raw", str(raw), "--fix", str(fix),
+                          "--mutant", f"m1={m1}", "--mutant", f"m2={m2}")
+        assert result.returncode == 0, result.stdout
+        assert "Validation PASSED" in result.stdout
     def test_validate_fix_workspace_fails_exit_1(self, tmp_path):
         """Test validate with fix workspace that FAILS -> exit 1, says fix must pass."""
         case_dir = tmp_path / "cases" / "validate-fix-fail"
@@ -1163,81 +1182,6 @@ else:
             assert result.returncode == 1
             assert "fix" in result.stdout
             assert "must pass" in result.stdout or "expected exit 0" in result.stdout
-        finally:
-            if dest_case.exists():
-                shutil.rmtree(dest_case)
-
-    def test_validate_mutant_workspace_passes_exit_1(self, tmp_path):
-        """Test validate with mutant workspace that PASSES -> exit 1 naming that mutant."""
-        case_dir = tmp_path / "cases" / "validate-mutant-pass"
-        case_dir.mkdir(parents=True)
-        oracle_dir = case_dir / "oracle"
-        oracle_dir.mkdir()
-
-        check_file = oracle_dir / "check.py"
-        check_file.write_text("""
-import json
-import os
-import sys
-
-workspace = sys.argv[1] if len(sys.argv) > 1 else "."
-# This check fails on raw/fix but passes on mutant
-test_file = os.path.join(workspace, "test.txt")
-if os.path.exists(test_file):
-    content = open(test_file).read()
-    if "mutant_marker" in content:
-        print(json.dumps({"ok": True, "reason": "mutant passes"}))
-    else:
-        print(json.dumps({"ok": False, "reason": "raw/fix fails"}))
-else:
-    print(json.dumps({"ok": False, "reason": "no test file"}))
-""")
-
-        task_file = case_dir / "task.md"
-        task_file.write_text("# Test task")
-
-        task_hash = hash_file(task_file)
-        check_hash = hash_file(check_file)
-
-        manifest = {
-            "id": "validate-mutant-pass",
-            "task_class": "test",
-            "runtime": "python",
-            "strength": "invariant-or-residual",
-            "status": "probation",
-            "suite": "tuning",
-            "hashes": {
-                "input": "abc",
-                "task": task_hash,
-                "check": check_hash
-            },
-            "origin": {"issue": "test"}
-        }
-        (case_dir / "manifest.json").write_text(json.dumps(manifest))
-
-        dest_case = CASES_DIR / "validate-mutant-pass"
-        if dest_case.exists():
-            shutil.rmtree(dest_case)
-        shutil.copytree(case_dir, dest_case)
-
-        try:
-            raw_dir = tmp_path / "raw"
-            raw_dir.mkdir()
-            (raw_dir / "test.txt").write_text("content")
-
-            fix_dir = tmp_path / "fix"
-            fix_dir.mkdir()
-            (fix_dir / "test.txt").write_text("content")
-
-            mutant_dir = tmp_path / "mutant"
-            mutant_dir.mkdir()
-            (mutant_dir / "test.txt").write_text("content mutant_marker")
-
-            result = run_oracle("validate", "validate-mutant-pass",
-                               "--raw", str(raw_dir), "--fix", str(fix_dir),
-                               "--mutant", f"badmutant={mutant_dir}", check=False)
-            assert result.returncode == 1
-            assert "badmutant" in result.stdout
         finally:
             if dest_case.exists():
                 shutil.rmtree(dest_case)
