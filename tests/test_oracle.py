@@ -1636,7 +1636,7 @@ class TestIsTextMatchingCheck:
         """Create a test script that implements is_text_matching_check."""
         repo = tmp_path / "repo"
         (repo / "tools").mkdir(parents=True)
-        
+
         test_script = repo / "tools" / "test_text_match.py"
         test_script.write_text(r'''
 import sys
@@ -1692,7 +1692,7 @@ print("TEXT_MATCHING" if result else "NOT_TEXT_MATCHING")
     def test_text_matching_no_execution_rejected(self, tmp_path):
         """is_text_matching_check: 3+ text patterns on source WITHOUT execution -> True (text-matching)."""
         test_script = self._create_checker_script(tmp_path)
-        
+
         check_source = """
 const source = fs.readFileSync('./file.js', 'utf8');
 if (source.includes('foo')) console.log('foo');
@@ -1714,7 +1714,7 @@ new vm.Script('console.log("dummy")').runInNewContext({});
     def test_text_matching_with_execution_accepted(self, tmp_path):
         """is_text_matching_check: 3+ text patterns on source WITH execution -> False (OK)."""
         test_script = self._create_checker_script(tmp_path)
-        
+
         check_source = """
 const source = fs.readFileSync('./file.js', 'utf8');
 if (source.includes('foo')) console.log('foo');
@@ -1736,7 +1736,7 @@ new vm.Script(source).runInContext({});
     def test_fewer_than_3_text_patterns_not_text_matching(self, tmp_path):
         """is_text_matching_check: fewer than 3 text patterns -> False (not text-matching)."""
         test_script = self._create_checker_script(tmp_path)
-        
+
         check_source = """
 const source = fs.readFileSync('./file.js', 'utf8');
 if (source.includes('foo')) console.log('foo');
@@ -1755,7 +1755,7 @@ if (source.includes('foo')) console.log('foo');
     def test_3_text_patterns_no_source_var_not_text_matching(self, tmp_path):
         """is_text_matching_check: 3+ patterns but no source variable -> False (not text-matching)."""
         test_script = self._create_checker_script(tmp_path)
-        
+
         check_source = """
 // Has 3+ text patterns but no source variable
 if ('foo'.includes('o')) console.log('foo');
@@ -2849,10 +2849,10 @@ class TestHasExecutingMarker:
         (repo / "tools").mkdir(parents=True)
         (repo / "schema").mkdir()
         (repo / "cases").mkdir()
-        
+
         shutil.copy2(ORACLE_SCRIPT, repo / "tools" / "oracle")
         shutil.copy2(SCHEMA_FILE, repo / "schema" / "case.schema.json")
-        
+
         # Create a test script that imports and tests the marker function
         test_script = repo / "tools" / "test_markers.py"
         test_script.write_text(r'''
@@ -2886,7 +2886,7 @@ print("DETECTED" if result else "NOT_DETECTED")
     def test_import_variable_detected_as_executing(self, tmp_path):
         """Dynamic-import rule: import(variable) should be detected as executing."""
         test_script = self._create_oracle_script_with_marker(tmp_path)
-        
+
         check_source = """
 const fs = require('fs');
 const path = process.argv[2];
@@ -2905,7 +2905,7 @@ import(path).then(m => { ... });
     def test_import_literal_string_not_detected(self, tmp_path):
         """Dynamic-import rule: import('./x.mjs') should NOT be detected (it's literal)."""
         test_script = self._create_oracle_script_with_marker(tmp_path)
-        
+
         check_source = """
 const fs = require('fs');
 import('./x.mjs').then(m => { ... });
@@ -2924,7 +2924,7 @@ import('./x.mjs').then(m => { ... });
     def test_vm_runInContext_detected(self, tmp_path):
         """Marker list: vm.runInContext should be detected."""
         test_script = self._create_oracle_script_with_marker(tmp_path)
-        
+
         check_source = """
 const vm = require('vm');
 vm.runInContext('console.log("test")', {});
@@ -2942,7 +2942,7 @@ vm.runInContext('console.log("test")', {});
     def test_vm_runInNewContext_detected(self, tmp_path):
         """Marker list: vm.runInNewContext should be detected."""
         test_script = self._create_oracle_script_with_marker(tmp_path)
-        
+
         check_source = """
 const vm = require('vm');
 vm.runInNewContext('console.log("test")', {});
@@ -2960,7 +2960,7 @@ vm.runInNewContext('console.log("test")', {});
     def test_vm_runInThisContext_detected(self, tmp_path):
         """Marker list: vm.runInThisContext should be detected."""
         test_script = self._create_oracle_script_with_marker(tmp_path)
-        
+
         check_source = """
 const vm = require('vm');
 vm.runInThisContext('console.log("test")');
@@ -2978,7 +2978,7 @@ vm.runInThisContext('console.log("test")');
     def test_new_vm_Script_detected(self, tmp_path):
         """Marker list: new vm.Script should be detected."""
         test_script = self._create_oracle_script_with_marker(tmp_path)
-        
+
         check_source = """
 const vm = require('vm');
 new vm.Script('console.log("test")');
@@ -2996,7 +2996,7 @@ new vm.Script('console.log("test")');
     def test_new_Function_detected(self, tmp_path):
         """Marker list: new Function( should be detected."""
         test_script = self._create_oracle_script_with_marker(tmp_path)
-        
+
         check_source = """
 const fn = new Function('console.log("test")');
 """
@@ -3013,7 +3013,7 @@ const fn = new Function('console.log("test")');
     def test_eval_detected(self, tmp_path):
         """Marker list: eval( should be detected."""
         test_script = self._create_oracle_script_with_marker(tmp_path)
-        
+
         check_source = """
 eval('console.log("test")');
 """
@@ -3030,7 +3030,7 @@ eval('console.log("test")');
     def test_no_executing_marker_rejected(self, tmp_path):
         """Non-executing check (no markers) should be rejected."""
         test_script = self._create_oracle_script_with_marker(tmp_path)
-        
+
         check_source = """
 const fs = require('fs');
 const source = fs.readFileSync('./x.mjs', 'utf8');
@@ -3056,7 +3056,7 @@ class TestClassifyMutantFailure:
         """Create a test script that implements classify_mutant_failure."""
         repo = tmp_path / "repo"
         (repo / "tools").mkdir(parents=True)
-        
+
         test_script = repo / "tools" / "test_classifier.py"
         test_script.write_text("""
 import sys
@@ -3087,7 +3087,7 @@ print(classification)
     def test_exit_code_2_structural(self, tmp_path):
         """classify_mutant_failure: exit_code == 2 -> structural."""
         test_script = self._create_classifier_script(tmp_path)
-        
+
         result = subprocess.run(
             [sys.executable, str(test_script)],
             input=json.dumps({"exit_code": 2, "reason": ""}),
@@ -3101,7 +3101,7 @@ print(classification)
     def test_not_found_substring_structural(self, tmp_path):
         """classify_mutant_failure: 'not found' substring -> structural."""
         test_script = self._create_classifier_script(tmp_path)
-        
+
         result = subprocess.run(
             [sys.executable, str(test_script)],
             input=json.dumps({"exit_code": 1, "reason": "file not found", "error": ""}),
@@ -3115,7 +3115,7 @@ print(classification)
     def test_unexpected_structure_substring_structural(self, tmp_path):
         """classify_mutant_failure: 'unexpected structure' substring -> structural."""
         test_script = self._create_classifier_script(tmp_path)
-        
+
         result = subprocess.run(
             [sys.executable, str(test_script)],
             input=json.dumps({"exit_code": 1, "reason": "unexpected structure in response", "error": ""}),
@@ -3129,7 +3129,7 @@ print(classification)
     def test_exit_code_1_other_reason_behavioral(self, tmp_path):
         """classify_mutant_failure: exit_code 1 with unrelated reason -> behavioral."""
         test_script = self._create_classifier_script(tmp_path)
-        
+
         result = subprocess.run(
             [sys.executable, str(test_script)],
             input=json.dumps({"exit_code": 1, "reason": "assertion failed: expected 42, got 43"}),
@@ -3143,7 +3143,7 @@ print(classification)
     def test_control_behavioral(self, tmp_path):
         """Control: other structural indicators should not trigger behavioral."""
         test_script = self._create_classifier_script(tmp_path)
-        
+
         result = subprocess.run(
             [sys.executable, str(test_script)],
             input=json.dumps({"exit_code": 1, "reason": "test failed", "error": "some other error"}),
@@ -3162,7 +3162,7 @@ class TestLintNoExec:
     def test_dynamic_import_variable_detected(self, tmp_path):
         """Dynamic-import: import(variable) accepted by lint."""
         repo = _tmp_repo(tmp_path)
-        
+
         case = repo / "cases" / "dynamic-import-var"
         (case / "oracle").mkdir(parents=True)
         check = case / "oracle" / "check.mjs"
@@ -3175,7 +3175,7 @@ const variable = workspace + '/main.js';
 import(variable).then(m => { ... });
 out({ok: true}, 0);
 """)
-        
+
         # Update manifest
         task = case / "task.md"
         task.write_text("# Test")
@@ -3217,7 +3217,7 @@ out({ok: true}, 0);
     def test_import_literal_string_lint_rejected(self, tmp_path):
         """Dynamic-import: import('./x.mjs') literal rejected if no other marker."""
         repo = _tmp_repo(tmp_path)
-        
+
         case = repo / "cases" / "import-literal"
         (case / "oracle").mkdir(parents=True)
         check = case / "oracle" / "check.mjs"
@@ -3228,7 +3228,7 @@ const source = fs.readFileSync('./x.mjs', 'utf8');
 import('./x.mjs').then(m => { ... });
 console.log('done');
 """)
-        
+
         task = case / "task.md"
         task.write_text("# Test")
         import json as json_mod
@@ -3270,26 +3270,26 @@ class TestCountingBehavioralVsStructural:
 
     def test_validate_fails_with_only_1_behavioral_and_2_structural(self, tmp_path):
         """Counting: validation fails with only 1 behavioral and 2 structural failures (< 2 behavioral required).
-        
+
         To test this:
-        - raw: should fail with exit 1 (behavioral) 
+        - raw: should fail with exit 1 (behavioral)
         - fix: should pass with exit 0
         - m1: should fail with exit 2 (structural)
         - m2: should fail with exit 2 (structural)
-        
+
         Only raw counts as behavioral (1), but we need >=2 behavioral failures.
         """
         repo = _tmp_repo(tmp_path)
         case = _marker_case(repo)
-        
+
         raw_dir = tmp_path / "raw"
         raw_dir.mkdir()
         (raw_dir / "PASS").write_text("no")  # Will fail -> exit 1 (behavioral)
-        
+
         fix_dir = tmp_path / "fix"
         fix_dir.mkdir()
         (fix_dir / "PASS").write_text("yes")  # Will pass -> exit 0
-        
+
         # Create a modified check that returns exit 2 for "structural" content
         case_dir = repo / "cases" / case
         check_file = case_dir / "oracle" / "check.py"
@@ -3310,7 +3310,7 @@ if os.path.exists(pass_file):
 else:
     sys.exit(1)
 """)
-        
+
         # Update manifest hash
         import hashlib
         def hash_file(path):
@@ -3318,7 +3318,7 @@ else:
             with open(path, "rb") as f:
                 h.update(f.read())
             return h.hexdigest()
-        
+
         manifest_path = case_dir / "manifest.json"
         manifest = json.loads(manifest_path.read_text())
         manifest["hashes"]["check"] = hash_file(check_file)
@@ -3327,7 +3327,7 @@ else:
         m1 = tmp_path / "m1"
         m1.mkdir()
         (m1 / "PASS").write_text("structural")  # Will return exit 2 (structural)
-        
+
         m2 = tmp_path / "m2"
         m2.mkdir()
         (m2 / "PASS").write_text("structural")  # Will return exit 2 (structural)
@@ -3343,41 +3343,41 @@ else:
         """Counting: validation passes with 2+ behavioral failures."""
         repo = _tmp_repo(tmp_path)
         case = _marker_case(repo)
-        
+
         # The marker case check passes if PASS file exists, fails if it doesn't
         # So we need to use PASS=no to make raw fail, and PASS=yes to make raw pass
         # Wait - the check only checks if the FILE exists, not its content!
         # So both "no" and "yes" would pass the check because the file exists.
-        
+
         # Let's check the actual marker case check logic:
         # ok = os.path.exists(os.path.join(sys.argv[1], 'PASS'))
         # This means: if PASS file exists -> ok=True -> exit 0
         # So we need to NOT create PASS for raw, m1, m2 to fail, and create it for fix to pass
-        
+
         raw_dir = tmp_path / "raw"
         raw_dir.mkdir()
         # Don't create PASS file - this will make the check fail (exit 1, behavioral)
-        
+
         fix_dir = tmp_path / "fix"
         fix_dir.mkdir()
         (fix_dir / "PASS").write_text("yes")  # File exists -> ok=True -> exit 0
-        
+
         m1 = tmp_path / "m1"
         m1.mkdir()
         # Don't create PASS file - this will make the check fail (exit 1, behavioral)
-        
+
         m2 = tmp_path / "m2"
         m2.mkdir()
         # Don't create PASS file - this will make the check fail (exit 1, behavioral)
-        
+
         result = _run_tmp(repo, "validate", case, "--raw", str(raw_dir), "--fix", str(fix_dir),
                           "--mutant", f"m1={m1}", "--mutant", f"m2={m2}")
-        
+
         # raw: PASS doesn't exist -> exit 1 (behavioral)
-        # fix: PASS exists -> exit 0 
+        # fix: PASS exists -> exit 0
         # m1: PASS doesn't exist -> exit 1 (behavioral)
         # m2: PASS doesn't exist -> exit 1 (behavioral)
-        # 
+        #
         # We have 3 behavioral failures (raw, m1, m2), which is >=2, so should pass
         assert result.returncode == 0, f"validate should pass: {result.stdout}\\n{result.stderr}"
         assert "Validation PASSED" in result.stdout
