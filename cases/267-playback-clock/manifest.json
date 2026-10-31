@@ -1,0 +1,26 @@
+{
+  "id": "267-playback-clock",
+  "task_class": "ui-time-logic",
+  "runtime": "node-vm",
+  "strength": "invariant-or-residual",
+  "status": "probation",
+  "suite": "tuning",
+  "hashes": {
+    "input": "git:51747bf^ (src/flightloads/static/workbench.js)",
+    "task": "7e771ae20b5a4af1aa7f331dd5e00c458f526adc6277721c53adc6b45e023774",
+    "check": "d2c60144f8df8acbe94b60493958f5eeb89d7ad301db67dc01c4fa115c79b7df"
+  },
+  "origin": {
+    "issue": "wcc118/codex-local-harness#212 (B6); wcc118/flight-loads#267",
+    "failing_model": "Qwen3-Coder-Next-FP8",
+    "failing_route": "codex-local-coder",
+    "failure_class": "time logic: elapsed wall time discarded each frame; reduced-motion default pre-empted",
+    "base_commit": "51747bf^",
+    "raw_commit": "51747bf",
+    "fix_commit": "2dd31ba",
+    "repo": "https://github.com/wcc118/flight-loads"
+  },
+  "registry_refs": [],
+  "memory_refs": [],
+  "notes": "Virtual-clock simulation of the real cursorPlayer. First-principles requirement: recorded time = speed x wall time. Tick spacing 1 s makes the raw clock bug visible at every speed; the raw S4 pass is vacuous (clock bug masks the reduced-motion default), which is why S4 is validated by a mutant."
+}
