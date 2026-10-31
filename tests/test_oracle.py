@@ -3321,6 +3321,53 @@ else:
         assert result.returncode == 1, f"Should fail validation with only 1 behavioral: {result.stdout}\\n{result.stderr}"
         assert "at least 2 behavioral" in result.stdout, f"Expected 'at least 2 behavioral' in output: {result.stdout}"
 
+    def test_validate_structural_exit1_mutants_not_counted(self, tmp_path):
+        """Mutants that exit 1 with a 'not found' reason are structural and must not count.
+
+        raw and fix are valid; one mutant fails behaviorally, one fails with exit 1 but a
+        'pattern not found' reason. Only 1 behavioral failure, so validation must fail.
+        Control: swapping the second mutant to a behavioral failure makes it pass.
+        """
+        import hashlib
+
+        def build(second_content):
+            root = tmp_path / second_content
+            root.mkdir()
+            repo = _tmp_repo(root)
+            case = _marker_case(repo)
+            case_dir = repo / "cases" / case
+            check_file = case_dir / "oracle" / "check.py"
+            check_file.write_text("""
+import json, os, sys
+ws = sys.argv[1] if len(sys.argv) > 1 else "."
+content = open(os.path.join(ws, 'PASS')).read().strip()
+if content == "yes":
+    print(json.dumps({'ok': True})); sys.exit(0)
+if content == "structural":
+    print(json.dumps({'ok': False, 'reason': 'pattern not found in source'})); sys.exit(1)
+print(json.dumps({'ok': False, 'reason': 'wrong value 3 != 4'})); sys.exit(1)
+""")
+            manifest_path = case_dir / "manifest.json"
+            manifest = json.loads(manifest_path.read_text())
+            manifest["hashes"]["check"] = hashlib.sha256(check_file.read_bytes()).hexdigest()
+            manifest_path.write_text(json.dumps(manifest, indent=2))
+            dirs = {}
+            for name, content in (("raw", "no"), ("fix", "yes"), ("m1", "no"), ("m2", second_content)):
+                d = root / ("ws_" + name)
+                d.mkdir()
+                (d / "PASS").write_text(content)
+                dirs[name] = d
+            return _run_tmp(repo, "validate", case, "--raw", str(dirs["raw"]), "--fix", str(dirs["fix"]),
+                            "--mutant", f"m1={dirs['m1']}", "--mutant", f"m2={dirs['m2']}")
+
+        bad = build("structural")
+        assert bad.returncode == 1, f"{bad.stdout}\n{bad.stderr}"
+        assert "at least 2 behavioral" in bad.stdout, bad.stdout
+        assert "only 1 failed" in bad.stdout and "structural: 1" in bad.stdout, bad.stdout
+
+        good = build("no")
+        assert good.returncode == 0, f"{good.stdout}\n{good.stderr}"
+
     def test_validate_passes_with_2_behavioral(self, tmp_path):
         """Counting: validation passes with 2+ behavioral failures."""
         repo = _tmp_repo(tmp_path)
