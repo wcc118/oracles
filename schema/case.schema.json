@@ -2,16 +2,114 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "title": "oracle case manifest",
   "type": "object",
-  "required": ["id", "task_class", "strength", "hashes", "origin", "suite", "status"],
+  "required": [
+    "id",
+    "task_class",
+    "runtime",
+    "strength",
+    "hashes",
+    "origin",
+    "suite",
+    "status"
+  ],
   "properties": {
-    "id": {"type": "string"},
-    "task_class": {"type": "string"},
-    "strength": {"enum": ["invariant-or-residual", "independent-reference", "converged-and-reviewed", "golden-master", "validated-against-data"]},
-    "status": {"enum": ["probation", "active", "retired"]},
-    "suite": {"enum": ["tuning", "heldout"]},
-    "hashes": {"type": "object", "required": ["input", "task", "check"], "properties": {"input": {"type": "string"}, "task": {"type": "string"}, "check": {"type": "string"}, "permission_profile": {"type": "string"}}},
-    "origin": {"type": "object", "properties": {"issue": {"type": "string"}, "pr": {"type": "string"}, "run_id": {"type": "string"}, "failing_model": {"type": "string"}, "failing_route": {"type": "string"}, "failure_class": {"type": "string"}, "base_commit": {"type": "string"}, "fix_commit": {"type": "string"}}},
-    "registry_refs": {"type": "array", "items": {"type": "string"}},
-    "memory_refs": {"type": "array", "items": {"type": "string"}}
+    "id": {
+      "type": "string"
+    },
+    "task_class": {
+      "type": "string"
+    },
+    "strength": {
+      "enum": [
+        "invariant-or-residual",
+        "independent-reference",
+        "converged-and-reviewed",
+        "golden-master",
+        "validated-against-data"
+      ]
+    },
+    "status": {
+      "enum": [
+        "probation",
+        "active",
+        "retired"
+      ]
+    },
+    "suite": {
+      "enum": [
+        "tuning",
+        "heldout"
+      ]
+    },
+    "hashes": {
+      "type": "object",
+      "required": [
+        "input",
+        "task",
+        "check"
+      ],
+      "properties": {
+        "input": {
+          "type": "string"
+        },
+        "task": {
+          "type": "string"
+        },
+        "check": {
+          "type": "string"
+        },
+        "permission_profile": {
+          "type": "string"
+        }
+      }
+    },
+    "origin": {
+      "type": "object",
+      "properties": {
+        "issue": {
+          "type": "string"
+        },
+        "pr": {
+          "type": "string"
+        },
+        "run_id": {
+          "type": "string"
+        },
+        "failing_model": {
+          "type": "string"
+        },
+        "failing_route": {
+          "type": "string"
+        },
+        "failure_class": {
+          "type": "string"
+        },
+        "base_commit": {
+          "type": "string"
+        },
+        "fix_commit": {
+          "type": "string"
+        }
+      }
+    },
+    "registry_refs": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "memory_refs": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "runtime": {
+      "enum": [
+        "python",
+        "node-vm",
+        "browser"
+      ]
+    }
   }
 }

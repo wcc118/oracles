@@ -1,0 +1,15 @@
+{
+  "validated_at": "2026-10-31",
+  "procedure": "manual (tools/oracle validate not yet built, issue #252 step 2)",
+  "node": "v22.22.2",
+  "results": {
+    "raw 261152c (recorded coder diff)": {"expected": "fail", "observed": "fail", "exit": 1},
+    "fix 2d7a513 (accepted primary correction)": {"expected": "pass", "observed": "pass", "exit": 0},
+    "mutant: gravity sign flipped": {"expected": "fail", "observed": "fail"},
+    "mutant: other applied dropped": {"expected": "fail", "observed": "fail"},
+    "mutant: inertia sign flipped": {"expected": "fail", "observed": "fail"},
+    "mutant: whole sum negated": {"expected": "fail", "observed": "fail"}
+  },
+  "not yet done": ["repeated-run stability (deterministic, no timing or randomness used)", "owner review of sign convention"],
+  "threats": "Convention taken from the primary's own fix and commit message, so the oracle encodes the primary's reading until the owner confirms. Covers the root case only; the plane-cut estimate sign error from the same commit is not yet checked."
+}
