@@ -5,15 +5,24 @@
   "strength": "invariant-or-residual",
   "status": "probation",
   "suite": "tuning",
-  "hashes": {"input": "git:261152c^ (src/flightloads/static/workbench.js)", "task": "09b28fbfa4333ddb6ce37374cde2338861cc007eb5b75c0aee3a4150f1422507", "check": "66863e2271addbf20730a9595ef5f01eafca04b6db8497a620da63bf7f9d7ac4"},
+  "hashes": {
+    "input": "git:261152c^ (src/flightloads/static/workbench.js)",
+    "task": "09b28fbfa4333ddb6ce37374cde2338861cc007eb5b75c0aee3a4150f1422507",
+    "check": "7ccc5894544a680b2f52da11a264a15a76139924ac78d2528f79ea84c7f427bd"
+  },
   "origin": {
     "issue": "wcc118/codex-local-harness#212 (B1); wcc118/flight-loads#264",
-    "failing_model": "Qwen3-Coder-Next-FP8", "failing_route": "codex-local-coder",
+    "failing_model": "Qwen3-Coder-Next-FP8",
+    "failing_route": "codex-local-coder",
     "failure_class": "sign convention; test enforced the bug on unbalanced synthetic data",
-    "base_commit": "261152c^", "raw_commit": "261152c", "fix_commit": "2d7a513",
+    "base_commit": "261152c^",
+    "raw_commit": "261152c",
+    "fix_commit": "2d7a513",
     "repo": "https://github.com/wcc118/flight-loads"
   },
   "registry_refs": [],
-  "memory_refs": ["memory:7f1e31e8a776956472a961d61ec0b40c"],
-  "notes": "Metamorphic check: some displayed value must equal the table total and rise by +delta per contribution. Convention source: flight-loads fix commit 2d7a513 message."
+  "memory_refs": [
+    "memory:7f1e31e8a776956472a961d61ec0b40c"
+  ],
+  "notes": "Two metamorphic probes (root, plane cut). Each displayed hand-check value must equal the table total and respond with the required sign to every contribution. Convention verified against backend station_loads.py (force=-total_f, contributions negated; level flight cut Fz = L - W) and fix commit 2d7a513."
 }
