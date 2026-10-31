@@ -248,7 +248,7 @@ def is_valid_case_id(case_id):
     if not case_id or len(case_id) > 80:
         return False
     pattern = r'^[a-zA-Z0-9][a-zA-Z0-9._-]*$'
-    return bool(re.match(pattern, case_id))
+    return bool(re.fullmatch(pattern, case_id))
 
 
 def normalize_whitespace(text):
@@ -257,10 +257,16 @@ def normalize_whitespace(text):
 
 
 def compute_signature(task_class, failure_class, why):
-    """Compute SHA-256 signature for ledger record."""
-    normalized_why = normalize_whitespace(why)
-    sig_input = f"{task_class.lower()}{failure_class.lower()}{normalized_why}"
-    return hashlib.sha256(sig_input.encode('utf-8')).hexdigest()
+    """Compute SHA-256 signature for ledger record.
+
+    Every field is whitespace-normalized and lowercased, then the fields are joined with the
+    ASCII unit separator. str.split() treats that separator as whitespace, so normalized fields
+    can never contain it and ("ab", "c") cannot collide with ("a", "bc").
+    """
+    parts = [normalize_whitespace(task_class).lower(),
+             normalize_whitespace(failure_class).lower(),
+             normalize_whitespace(why).lower()]
+    return hashlib.sha256("\x1f".join(parts).encode('utf-8')).hexdigest()
 
 
 def get_ledger_path():

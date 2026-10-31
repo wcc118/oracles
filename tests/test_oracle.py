@@ -1706,6 +1706,39 @@ class TestCaptureCommand:
 
         assert rec1["signature"] == rec2["signature"]
 
+    def _capture_sig(self, repo, case_id, why, task_class, failure_class):
+        result = _run_tmp(repo, "capture", case_id, "--why", why, "--task-class", task_class,
+                          "--runtime", "python", "--failure-class", failure_class)
+        assert result.returncode == 0, result.stderr
+        records = [json.loads(line) for line in
+                   (repo / "ledger" / "captures.jsonl").read_text().splitlines() if line.strip()]
+        return records[-1]
+
+    def test_capture_signature_ignores_case_and_whitespace_in_why(self, tmp_path):
+        """Only the case/whitespace of the free text differs, so the signature must match and repeat_count rise."""
+        repo = _tmp_repo(tmp_path)
+        first = self._capture_sig(repo, "case-a", "Root reaction shown with wrong sign", "ui", "sign")
+        second = self._capture_sig(repo, "case-b", "  root  REACTION shown with wrong SIGN ", "ui", "sign")
+        assert first["signature"] == second["signature"]
+        assert (first["repeat_count"], second["repeat_count"]) == (1, 2)
+
+    def test_capture_signature_fields_are_separated(self, tmp_path):
+        """("ab","c") and ("a","bc") concatenate identically without a separator; they must not collide."""
+        repo = _tmp_repo(tmp_path)
+        first = self._capture_sig(repo, "case-a", "same text", "ab", "c")
+        second = self._capture_sig(repo, "case-b", "same text", "a", "bc")
+        assert first["signature"] != second["signature"]
+        assert second["repeat_count"] == 1
+
+    def test_capture_rejects_case_id_with_trailing_newline(self, tmp_path):
+        """re.match with $ accepts a trailing newline; the id check must not."""
+        repo = _tmp_repo(tmp_path)
+        bad = _run_tmp(repo, "capture", "ok-id\n", "--why", "x", "--task-class", "t", "--runtime", "python")
+        assert bad.returncode == 2
+        assert not any((repo / "cases").iterdir())
+        good = _run_tmp(repo, "capture", "ok-id", "--why", "x", "--task-class", "t", "--runtime", "python")
+        assert good.returncode == 0
+
     def test_capture_different_failure_class_different_signature(self, tmp_path):
         """Test that different failure_class produces different signature."""
         repo = _tmp_repo(tmp_path)
