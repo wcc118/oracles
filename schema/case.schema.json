@@ -32,7 +32,8 @@
       "enum": [
         "probation",
         "active",
-        "retired"
+        "retired",
+        "draft"
       ]
     },
     "suite": {
