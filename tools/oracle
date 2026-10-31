@@ -36,46 +36,46 @@ def load_manifest(case_id):
     manifest_path = CASES_DIR / case_id / "manifest.json"
     if not manifest_path.exists():
         return None, f"manifest not found: {manifest_path}"
-    
+
     try:
         with open(manifest_path) as f:
             data = json.load(f)
     except json.JSONDecodeError as e:
         return None, f"invalid JSON in {manifest_path}: {e}"
-    
+
     # Validate against schema
     if jsonschema:
         try:
             jsonschema.validate(instance=data, schema=load_schema())
         except jsonschema.ValidationError as e:
             return None, f"validation error in {case_id}: {e.message}"
-    
+
     # Verify required fields
     required = ["id", "task_class", "runtime", "strength", "hashes", "origin", "suite", "status"]
     for field in required:
         if field not in data:
             return None, f"missing required field '{field}' in {case_id}"
-    
+
     # Verify hashes
     hashes = data.get("hashes", {})
     task_hash = hashes.get("task")
     check_hash = hashes.get("check")
-    
+
     task_path = CASES_DIR / case_id / "task.md"
     check_path = CASES_DIR / case_id / "oracle" / "check.mjs"
     if not task_path.exists():
         task_path = CASES_DIR / case_id / "oracle" / "check.py"
-    
+
     if task_hash:
         actual_task = hash_file(task_path)
         if actual_task != task_hash:
             return None, f"hash mismatch in {case_id}: task.md expected {task_hash}, got {actual_task}"
-    
+
     if check_hash:
         actual_check = hash_file(check_path)
         if actual_check != check_hash:
             return None, f"hash mismatch in {case_id}: oracle/check.* expected {check_hash}, got {actual_check}"
-    
+
     return data, None
 
 
@@ -117,20 +117,20 @@ def list_cases(suite=None, status=None):
             print(f"Error loading {case_id}: {err}", file=sys.stderr)
             continue
         cases.append(manifest)
-    
+
     # Filter
     if suite:
         cases = [c for c in cases if c.get("suite") == suite]
     if status:
         cases = [c for c in cases if c.get("status") == status]
-    
+
     # Sort by ID
     cases.sort(key=lambda x: x.get("id", ""))
-    
+
     # Print table header
     print(f"{'ID':<30} {'Runtime':<12} {'Strength':<25} {'Status':<12} {'Suite':<10}")
     print("-" * 90)
-    
+
     for c in cases:
         cid = c.get("id", "")
         runtime = c.get("runtime", "")
@@ -146,24 +146,24 @@ def run_case(case_id, workspace, runtime=None, timeout=120, json_output=False):
     if err:
         print(json.dumps({"ok": False, "error": err}), file=sys.stderr)
         return 2
-    
+
     # Use manifest runtime if not specified
     check_runtime = runtime or manifest.get("runtime", "")
-    
+
     if check_runtime == "browser":
         print(json.dumps({"ok": False, "error": "unsupported runtime: browser"}))
         return 2
-    
+
     check_path = CASES_DIR / case_id / "oracle" / "check.mjs"
     if not check_path.exists():
         check_path = CASES_DIR / case_id / "oracle" / "check.py"
-    
+
     if not check_path.exists():
         print(json.dumps({"ok": False, "error": f"check not found: {check_path}"}))
         return 2
-    
+
     start_time = time.time()
-    
+
     try:
         if check_path.suffix == ".mjs":
             cmd = ["node", str(check_path), workspace]
@@ -172,26 +172,26 @@ def run_case(case_id, workspace, runtime=None, timeout=120, json_output=False):
         else:
             print(json.dumps({"ok": False, "error": f"unknown check type: {check_path.suffix}"}))
             return 2
-        
+
         result = subprocess.run(
             cmd,
             capture_output=True,
             text=True,
             timeout=timeout
         )
-        
+
         elapsed = time.time() - start_time
         commit = get_oracle_commit()
-        
+
         # Parse output
         output = result.stdout.strip()
         exit_code = result.returncode
-        
+
         try:
             data = json.loads(output) if output else {}
         except json.JSONDecodeError:
             data = {"raw_output": output}
-        
+
         # Add metadata
         data["case"] = case_id
         data["runtime"] = check_runtime
@@ -199,17 +199,17 @@ def run_case(case_id, workspace, runtime=None, timeout=120, json_output=False):
         data["status"] = manifest.get("status", "")
         data["commit"] = commit
         data["elapsed"] = elapsed
-        
+
         if exit_code == 2:
             data["timeout"] = elapsed >= timeout
-        
+
         if json_output:
             print(json.dumps(data, indent=2))
         else:
             print(json.dumps(data))
-        
+
         return exit_code
-    
+
     except subprocess.TimeoutExpired:
         commit = get_oracle_commit()
         data = {
@@ -235,23 +235,23 @@ def validate_case(case_id, raw_dir, fix_dir, mutants=None, write=False):
     if err:
         print(f"Error: {err}", file=sys.stderr)
         return 1
-    
+
     check_path = CASES_DIR / case_id / "oracle" / "check.mjs"
     if not check_path.exists():
         check_path = CASES_DIR / case_id / "oracle" / "check.py"
-    
+
     if not check_path.exists():
         print(f"Error: check not found: {check_path}", file=sys.stderr)
         return 1
-    
+
     results = {}
-    
+
     # Run on raw (should FAIL)
     results["raw"] = run_workspace(check_path, raw_dir, case_id, "raw")
-    
+
     # Run on fix (should PASS)
     results["fix"] = run_workspace(check_path, fix_dir, case_id, "fix")
-    
+
     # Run on mutants
     if mutants:
         for name, dir in mutants.items():
@@ -259,35 +259,35 @@ def validate_case(case_id, raw_dir, fix_dir, mutants=None, write=False):
     else:
         # If no mutants provided, create a warning
         print("Warning: No mutants provided, at least 2 required", file=sys.stderr)
-    
+
     # Check admission procedure
     errors = []
-    
+
     if results["raw"]["exit_code"] != 1:
         errors.append(f"raw: expected exit 1 (fail), got {results['raw']['exit_code']}")
-    
+
     if results["fix"]["exit_code"] != 0:
         errors.append(f"fix: expected exit 0 (pass), got {results['fix']['exit_code']}")
-    
+
     # Count mutants that failed
     failed_mutants = sum(1 for name, r in results.items() if name not in ("raw", "fix") and r["exit_code"] == 1)
-    
+
     if failed_mutants < 2:
         errors.append(f"mutants: at least 2 must fail, only {failed_mutants} failed")
-    
+
     for name, r in results.items():
         if name in ("raw", "fix"):
             continue
         if r["exit_code"] != 1:
             errors.append(f"{name}: expected exit 1 (fail), got {r['exit_code']}")
-    
+
     # Print table
     print(f"{'Workspace':<15} {'Exit':<6} {'OK':<6} {'Result'}")
     print("-" * 70)
     for name, r in results.items():
         ok_str = "✓" if r["ok"] else "✗"
         print(f"{name:<15} {r['exit_code']:<6} {ok_str:<6} {r.get('reason', '')}")
-    
+
     if errors:
         print("\nValidation FAILED:")
         for e in errors:
@@ -296,7 +296,7 @@ def validate_case(case_id, raw_dir, fix_dir, mutants=None, write=False):
     else:
         print("\nValidation PASSED")
         verdict = True
-    
+
     # Write report if requested
     if write:
         report_dir = CASES_DIR / case_id / "validation"
@@ -310,7 +310,7 @@ def validate_case(case_id, raw_dir, fix_dir, mutants=None, write=False):
         with open(report_dir / "report.json", "w") as f:
             json.dump(report, f, indent=2)
         print(f"\nReport written to {report_dir / 'report.json'}")
-    
+
     return 0 if verdict else 1
 
 
@@ -322,18 +322,18 @@ def run_workspace(check_path, workspace, case_id, workspace_name):
         cmd = ["python3", str(check_path), workspace]
     else:
         return {"exit_code": 2, "ok": False, "reason": f"unknown type: {check_path.suffix}"}
-    
+
     try:
         result = subprocess.run(cmd, capture_output=True, text=True, timeout=120)
-        
+
         try:
             data = json.loads(result.stdout.strip()) if result.stdout.strip() else {}
         except json.JSONDecodeError:
             data = {"raw_output": result.stdout.strip()}
-        
+
         ok = data.get("ok", result.returncode == 0)
         reason = data.get("reason", "") or data.get("error", "")
-        
+
         return {
             "exit_code": result.returncode,
             "ok": ok,
@@ -351,7 +351,7 @@ def leakcheck(workspace):
     """Check if workspace leaks oracle content."""
     workspace_path = Path(workspace).resolve()
     leaks = []
-    
+
     # Check if workspace is inside restricted directories
     for pattern in RESTRICTED_DIRS:
         # Convert glob pattern to actual path
@@ -382,7 +382,7 @@ def leakcheck(workspace):
                     leaks.append(f"workspace inside restricted: {workspace_path} (under {restricted})")
                 except ValueError:
                     pass
-    
+
     # Check for identical-content files
     restricted_files = []
     for pattern in RESTRICTED_DIRS:
@@ -406,7 +406,7 @@ def leakcheck(workspace):
                 for f in restricted_dir.rglob("*"):
                     if f.is_file():
                         restricted_files.append(f)
-    
+
     # Compute hashes of restricted files
     restricted_hashes = {}
     for f in restricted_files:
@@ -416,7 +416,7 @@ def leakcheck(workspace):
                 restricted_hashes[h] = f
         except Exception:
             pass
-    
+
     # Check workspace files
     if workspace_path.exists():
         for f in workspace_path.rglob("*"):
@@ -434,7 +434,7 @@ def leakcheck(workspace):
                             leaks.append(f"identical file: {f} (matches {restricted_hashes[h]})")
                 except Exception:
                     pass
-    
+
     if leaks:
         print("Leakcheck FAILED - offending paths:")
         for leak in leaks:
@@ -451,12 +451,12 @@ def main():
         description="Oracle CLI: load case manifests, run checks, validate against workspaces"
     )
     subparsers = parser.add_subparsers(dest="command", help="Commands")
-    
+
     # list command
     list_parser = subparsers.add_parser("list", help="List cases")
     list_parser.add_argument("--suite", choices=["tuning", "heldout"], help="Filter by suite")
     list_parser.add_argument("--status", choices=["probation", "active", "retired"], help="Filter by status")
-    
+
     # run command
     run_parser = subparsers.add_parser("run", help="Run a case check")
     run_parser.add_argument("case", help="Case ID")
@@ -464,7 +464,7 @@ def main():
     run_parser.add_argument("--runtime", help="Override runtime")
     run_parser.add_argument("--timeout", type=float, default=120, help="Timeout in seconds (default: 120)")
     run_parser.add_argument("--json", action="store_true", help="Pretty print JSON output")
-    
+
     # validate command
     validate_parser = subparsers.add_parser("validate", help="Validate case against workspaces")
     validate_parser.add_argument("case", help="Case ID")
@@ -472,13 +472,13 @@ def main():
     validate_parser.add_argument("--fix", required=True, help="Fix workspace directory")
     validate_parser.add_argument("--mutant", action="append", help="Mutant name=dir (can be repeated)")
     validate_parser.add_argument("--write", action="store_true", help="Write validation report")
-    
+
     # leakcheck command
     leakcheck_parser = subparsers.add_parser("leakcheck", help="Check for oracle leakage")
     leakcheck_parser.add_argument("workspace", help="Workspace directory")
-    
+
     args = parser.parse_args()
-    
+
     if args.command == "list":
         list_cases(suite=args.suite, status=args.status)
     elif args.command == "run":
