@@ -1521,3 +1521,482 @@ sys.exit(2)
         finally:
             if dest_case.exists():
                 shutil.rmtree(dest_case)
+
+
+class TestCaptureCommand:
+    """Tests for the capture command."""
+
+    def test_capture_basic_draft_case(self, tmp_path):
+        """Test creating a basic draft case with all required fields."""
+        repo = _tmp_repo(tmp_path)
+        result = _run_tmp(
+            repo, "capture", "test-case-1",
+            "--why", "This is a test failure",
+            "--task-class", "bug",
+            "--runtime", "python",
+            "--suite", "tuning"
+        )
+        assert result.returncode == 0
+        assert "Created draft case 'test-case-1'" in result.stdout
+
+        # Check case directory structure
+        case_dir = repo / "cases" / "test-case-1"
+        assert case_dir.exists()
+        assert (case_dir / "oracle").exists()
+        assert (case_dir / "oracle" / ".gitkeep").exists()
+        assert (case_dir / "task.md").exists()
+        assert (case_dir / "manifest.json").exists()
+
+        # Check manifest
+        manifest = json.loads((case_dir / "manifest.json").read_text())
+        assert manifest["status"] == "draft"
+        assert manifest["task_class"] == "bug"
+        assert manifest["runtime"] == "python"
+        assert manifest["suite"] == "tuning"
+        assert manifest["hashes"]["input"] == "pending"
+        assert manifest["hashes"]["check"] == "pending"
+        assert "task" in manifest["hashes"]
+
+    def test_capture_invalid_case_id_empty(self, tmp_path):
+        """Test capture with empty case_id fails."""
+        repo = _tmp_repo(tmp_path)
+        result = _run_tmp(
+            repo, "capture", "",
+            "--why", "This is a test failure",
+            "--task-class", "bug",
+            "--runtime", "python"
+        )
+        assert result.returncode == 2
+        assert "Error:" in result.stderr
+
+    def test_capture_invalid_case_id_special_chars(self, tmp_path):
+        """Test capture with invalid case_id (special chars) fails."""
+        repo = _tmp_repo(tmp_path)
+        result = _run_tmp(
+            repo, "capture", "test@case",
+            "--why", "This is a test failure",
+            "--task-class", "bug",
+            "--runtime", "python"
+        )
+        assert result.returncode == 2
+        assert "Error:" in result.stderr
+
+    def test_capture_valid_case_id_starts_digit(self, tmp_path):
+        """Test capture with case_id starting with digit succeeds (allowed by spec)."""
+        repo = _tmp_repo(tmp_path)
+        result = _run_tmp(
+            repo, "capture", "123test",
+            "--why", "This is a test failure",
+            "--task-class", "bug",
+            "--runtime", "python"
+        )
+        assert result.returncode == 0
+        assert "Created draft case '123test'" in result.stdout
+
+    def test_capture_why_max_length(self, tmp_path):
+        """Test capture with why exceeding 1000 chars fails."""
+        repo = _tmp_repo(tmp_path)
+        long_why = "x" * 1001
+        result = _run_tmp(
+            repo, "capture", "test-case",
+            "--why", long_why,
+            "--task-class", "bug",
+            "--runtime", "python"
+        )
+        assert result.returncode == 2
+        assert "Error:" in result.stderr
+
+    def test_capture_refuses_overwrite(self, tmp_path):
+        """Test capture refuses to overwrite existing case."""
+        repo = _tmp_repo(tmp_path)
+        # Create first case
+        result = _run_tmp(
+            repo, "capture", "existing-case",
+            "--why", "First capture",
+            "--task-class", "bug",
+            "--runtime", "python"
+        )
+        assert result.returncode == 0
+
+        # Try to create same case again
+        result = _run_tmp(
+            repo, "capture", "existing-case",
+            "--why", "Second capture",
+            "--task-class", "test",
+            "--runtime", "node-vm"
+        )
+        assert result.returncode == 2
+        assert "already exists" in result.stderr
+
+        # First case should be unchanged
+        manifest = json.loads((repo / "cases" / "existing-case" / "manifest.json").read_text())
+        assert manifest["task_class"] == "bug"
+
+    def test_capture_with_all_origin_fields(self, tmp_path):
+        """Test capture with all origin fields (repo, commits, issue, pr, etc)."""
+        repo = _tmp_repo(tmp_path)
+        result = _run_tmp(
+            repo, "capture", "origin-test",
+            "--why", "Test with origin fields",
+            "--task-class", "bug",
+            "--runtime", "node-vm",
+            "--origin-repo", "owner/repo",
+            "--base-commit", "abc123",
+            "--raw-commit", "def456",
+            "--fix-commit", "ghi789",
+            "--issue", "wcc118/oracles#1",
+            "--pr", "wcc118/oracles#2",
+            "--run-id", "run-123",
+            "--model", "gpt-4",
+            "--route", "/api/test",
+            "--failure-class", "logic_error"
+        )
+        assert result.returncode == 0
+
+        manifest = json.loads((repo / "cases" / "origin-test" / "manifest.json").read_text())
+        origin = manifest["origin"]
+        assert origin["origin-repo"] == "owner/repo"
+        assert origin["base-commit"] == "abc123"
+        assert origin["raw-commit"] == "def456"
+        assert origin["fix-commit"] == "ghi789"
+        assert origin["issue"] == "wcc118/oracles#1"
+        assert origin["pr"] == "wcc118/oracles#2"
+        assert origin["run-id"] == "run-123"
+        assert origin["failing-model"] == "gpt-4"
+        assert origin["failing-route"] == "/api/test"
+        assert origin["failure-class"] == "logic_error"
+
+        # Check task.md contains origin refs
+        task_content = (repo / "cases" / "origin-test" / "task.md").read_text()
+        assert "origin-repo: owner/repo" in task_content
+
+    def test_capture_signature_stability(self, tmp_path):
+        """Test signature is stable across captures with same inputs."""
+        repo = _tmp_repo(tmp_path)
+
+        # Capture first case
+        result1 = _run_tmp(
+            repo, "capture", "sig-test-1",
+            "--why", "  This is a test  ",  # Extra whitespace
+            "--task-class", "bug",
+            "--runtime", "python",
+            "--failure-class", "error"
+        )
+        assert result1.returncode == 0
+
+        # Capture second case with same inputs
+        result2 = _run_tmp(
+            repo, "capture", "sig-test-2",
+            "--why", "This is a test",
+            "--task-class", "bug",
+            "--runtime", "python",
+            "--failure-class", "error"
+        )
+        assert result2.returncode == 0
+
+        # Signatures should match (whitespace normalized)
+        ledger1 = repo / "ledger" / "captures.jsonl"
+        ledger2 = repo / "ledger" / "captures.jsonl"
+
+        lines1 = ledger1.read_text().strip().split('\n')
+        lines2 = ledger2.read_text().strip().split('\n')
+
+        rec1 = json.loads(lines1[0])
+        rec2 = json.loads(lines2[0])
+
+        assert rec1["signature"] == rec2["signature"]
+
+    def test_capture_different_failure_class_different_signature(self, tmp_path):
+        """Test that different failure_class produces different signature."""
+        repo = _tmp_repo(tmp_path)
+
+        result1 = _run_tmp(
+            repo, "capture", "diff-sig-1",
+            "--why", "Same why text",
+            "--task-class", "bug",
+            "--runtime", "python",
+            "--failure-class", "error_a"
+        )
+        assert result1.returncode == 0
+
+        result2 = _run_tmp(
+            repo, "capture", "diff-sig-2",
+            "--why", "Same why text",
+            "--task-class", "bug",
+            "--runtime", "python",
+            "--failure-class", "error_b"
+        )
+        assert result2.returncode == 0
+
+        lines = (repo / "ledger" / "captures.jsonl").read_text().strip().split('\n')
+        rec1 = json.loads(lines[0])
+        rec2 = json.loads(lines[1])
+
+        assert rec1["signature"] != rec2["signature"]
+
+    def test_capture_repeat_count(self, tmp_path):
+        """Test repeat_count increments for same signature."""
+        repo = _tmp_repo(tmp_path)
+
+        # First capture
+        result1 = _run_tmp(
+            repo, "capture", "repeat-1",
+            "--why", "Repeat test",
+            "--task-class", "bug",
+            "--runtime", "python"
+        )
+        assert result1.returncode == 0
+        rec1 = json.loads((repo / "ledger" / "captures.jsonl").read_text().strip().split('\n')[0])
+        assert rec1["repeat_count"] == 1
+
+        # Second capture with same signature
+        result2 = _run_tmp(
+            repo, "capture", "repeat-2",
+            "--why", "Repeat test",
+            "--task-class", "bug",
+            "--runtime", "python"
+        )
+        assert result2.returncode == 0
+        lines = (repo / "ledger" / "captures.jsonl").read_text().strip().split('\n')
+        rec2 = json.loads(lines[1])
+        assert rec2["repeat_count"] == 2
+
+    def test_capture_case_in_list(self, tmp_path):
+        """Test draft case appears in list."""
+        repo = _tmp_repo(tmp_path)
+        _run_tmp(
+            repo, "capture", "list-test",
+            "--why", "Test for list",
+            "--task-class", "bug",
+            "--runtime", "python"
+        )
+
+        result = _run_tmp(repo, "list")
+        assert result.returncode == 0
+        assert "list-test" in result.stdout
+        assert "draft" in result.stdout
+
+    def test_capture_list_filter_by_status_draft(self, tmp_path):
+        """Test list --status draft shows only draft cases."""
+        repo = _tmp_repo(tmp_path)
+        _run_tmp(
+            repo, "capture", "draft-1",
+            "--why", "Draft case",
+            "--task-class", "bug",
+            "--runtime", "python"
+        )
+
+        # Also create an active case manually
+        case_dir = repo / "cases" / "active-1"
+        case_dir.mkdir()
+        (case_dir / "oracle").mkdir()
+        (case_dir / "oracle" / ".gitkeep").write_text("")
+        (case_dir / "task.md").write_text("# Task")
+        task_hash = hash_file(case_dir / "task.md")
+        manifest = {
+            "id": "active-1",
+            "task_class": "test",
+            "runtime": "python",
+            "strength": "invariant-or-residual",
+            "status": "active",
+            "suite": "tuning",
+            "hashes": {"input": "pending", "task": task_hash, "check": "pending"},
+            "origin": {"issue": "test"}
+        }
+        (case_dir / "manifest.json").write_text(json.dumps(manifest))
+
+        result = _run_tmp(repo, "list", "--status", "draft")
+        assert result.returncode == 0
+        assert "draft-1" in result.stdout
+        # active-1 has pending hashes (invalid for non-draft), so it won't appear
+        assert "active-1" not in result.stdout
+
+        # Create a proper active case with valid hashes
+        case_dir2 = repo / "cases" / "active-2"
+        case_dir2.mkdir()
+        (case_dir2 / "oracle").mkdir()
+        (case_dir2 / "oracle" / ".gitkeep").write_text("")
+        (case_dir2 / "task.md").write_text("# Task for active case")
+        task_hash2 = hash_file(case_dir2 / "task.md")
+        check_file = case_dir2 / "oracle" / "check.py"
+        check_file.write_text("import json; print(json.dumps({'ok': True})); sys.exit(0)\n")
+        check_hash2 = hash_file(check_file)
+        manifest2 = {
+            "id": "active-2",
+            "task_class": "test",
+            "runtime": "python",
+            "strength": "invariant-or-residual",
+            "status": "active",
+            "suite": "tuning",
+            "hashes": {"input": "pending", "task": task_hash2, "check": check_hash2},
+            "origin": {"issue": "test"}
+        }
+        (case_dir2 / "manifest.json").write_text(json.dumps(manifest2))
+
+        # Now list by status active should show active-2
+        result = _run_tmp(repo, "list", "--status", "active")
+        assert result.returncode == 0
+        assert "draft-1" not in result.stdout
+        assert "active-2" in result.stdout
+        assert "active-1" not in result.stdout
+
+
+class TestLedgerCommand:
+    """Tests for the ledger command."""
+
+    def test_ledger_empty_initially(self, tmp_path):
+        """Test ledger shows no records when empty."""
+        repo = _tmp_repo(tmp_path)
+        result = _run_tmp(repo, "ledger")
+        assert result.returncode == 0
+        assert "No ledger records found" in result.stdout
+
+    def test_ledger_shows_records(self, tmp_path):
+        """Test ledger shows records after capture."""
+        repo = _tmp_repo(tmp_path)
+        _run_tmp(
+            repo, "capture", "ledger-test",
+            "--why", "Test ledger",
+            "--task-class", "bug",
+            "--runtime", "python"
+        )
+
+        result = _run_tmp(repo, "ledger")
+        assert result.returncode == 0
+        assert "ledger-test" in result.stdout
+        assert "bug" in result.stdout
+
+    def test_ledger_repeats_shows_only_repeats(self, tmp_path):
+        """Test ledger --repeats shows only signatures with count >= 2."""
+        repo = _tmp_repo(tmp_path)
+
+        # Create one unique capture
+        _run_tmp(
+            repo, "capture", "unique-1",
+            "--why", "Unique capture",
+            "--task-class", "bug",
+            "--runtime", "python"
+        )
+
+        # Create two captures with same signature
+        _run_tmp(
+            repo, "capture", "repeat-1",
+            "--why", "Repeat test",
+            "--task-class", "bug",
+            "--runtime", "python"
+        )
+        _run_tmp(
+            repo, "capture", "repeat-2",
+            "--why", "Repeat test",
+            "--task-class", "bug",
+            "--runtime", "python"
+        )
+
+        result = _run_tmp(repo, "ledger", "--repeats")
+        assert result.returncode == 0
+        assert "repeat" in result.stdout.lower()
+        assert "unique" not in result.stdout
+
+    def test_ledger_malformed_line_skipped(self, tmp_path):
+        """Test ledger handles malformed lines gracefully."""
+        repo = _tmp_repo(tmp_path)
+
+        # Create a valid capture
+        _run_tmp(
+            repo, "capture", "valid-1",
+            "--why", "Valid",
+            "--task-class", "bug",
+            "--runtime", "python"
+        )
+
+        # Add a malformed line to ledger
+        ledger_path = repo / "ledger" / "captures.jsonl"
+        ledger_path.write_text(ledger_path.read_text() + "not valid json\n")
+
+        result = _run_tmp(repo, "ledger")
+        assert result.returncode == 0
+        assert "valid-1" in result.stdout
+        assert "malformed" in result.stdout.lower() or "LINE" in result.stdout
+
+    def test_ledger_record_structure(self, tmp_path):
+        """Test ledger record has all required fields."""
+        repo = _tmp_repo(tmp_path)
+        _run_tmp(
+            repo, "capture", "struct-test",
+            "--why", "Structure test",
+            "--task-class", "test_class",
+            "--runtime", "python",
+            "--failure-class", "failure_cls"
+        )
+
+        lines = (repo / "ledger" / "captures.jsonl").read_text().strip().split('\n')
+        rec = json.loads(lines[0])
+
+        assert "id" in rec
+        assert "timestamp" in rec
+        assert "case_id" in rec
+        assert "task_class" in rec
+        assert "failure_class" in rec
+        assert "runtime" in rec
+        assert "why" in rec
+        assert "signature" in rec
+        assert "repeat_count" in rec
+
+
+class TestDraftCaseRejection:
+    """Tests for draft case rejection in run/validate."""
+
+    def test_run_rejects_draft_case(self, tmp_path):
+        """Test run returns exit 2 for draft case."""
+        repo = _tmp_repo(tmp_path)
+        _run_tmp(
+            repo, "capture", "draft-run-test",
+            "--why", "Draft for run test",
+            "--task-class", "bug",
+            "--runtime", "python"
+        )
+
+        ws = tmp_path / "ws"
+        ws.mkdir()
+
+        result = _run_tmp(repo, "run", "draft-run-test", str(ws))
+        assert result.returncode == 2
+        # Draft case rejection error goes to stderr as JSON
+        assert "draft case, no oracle yet" in result.stderr
+
+    def test_validate_rejects_draft_case(self, tmp_path):
+        """Test validate returns exit 2 for draft case."""
+        repo = _tmp_repo(tmp_path)
+        _run_tmp(
+            repo, "capture", "draft-val-test",
+            "--why", "Draft for validate test",
+            "--task-class", "bug",
+            "--runtime", "python"
+        )
+
+        raw_dir = tmp_path / "raw"
+        raw_dir.mkdir()
+        fix_dir = tmp_path / "fix"
+        fix_dir.mkdir()
+
+        result = _run_tmp(
+            repo, "validate", "draft-val-test",
+            "--raw", str(raw_dir),
+            "--fix", str(fix_dir)
+        )
+        assert result.returncode == 2
+        assert "draft case, no oracle yet" in result.stderr
+
+    def test_list_draft_case_shows_pending_hashes(self, tmp_path):
+        """Test list shows draft case with pending hashes."""
+        repo = _tmp_repo(tmp_path)
+        _run_tmp(
+            repo, "capture", "pending-hash-test",
+            "--why", "Pending hash test",
+            "--task-class", "bug",
+            "--runtime", "python"
+        )
+
+        result = _run_tmp(repo, "list", "--status", "draft")
+        assert result.returncode == 0
+        assert "pending-hash-test" in result.stdout

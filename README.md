@@ -8,7 +8,7 @@ workspace.
 Layout: `cases/<id>/` (manifest, task, input, oracle, validation), `invariants/`
 (shared parameterized physics checks), `registry/` (validated reference results),
 `suites/` (tuning vs heldout), `projects/<name>/profile.yaml` (per-project overlay),
-`ledger/` (append-only run and escape history), `tools/oracle` (run|validate|list).
+`ledger/` (append-only run and escape history), `tools/oracle` (run|validate|list|capture|ledger).
 
 ## Oracle CLI
 
@@ -16,7 +16,7 @@ The `tools/oracle` command provides several operations for working with cases:
 
 ```bash
 # List all cases (optionally filtered)
-python3 tools/oracle list [--suite tuning|heldout] [--status probation|active|retired]
+python3 tools/oracle list [--suite tuning|heldout] [--status probation|active|retired|draft]
 
 # Run a case check against a workspace
 python3 tools/oracle run CASE_ID WORKSPACE [--json] [--timeout SECONDS]
@@ -26,6 +26,15 @@ python3 tools/oracle validate CASE_ID --raw RAW_DIR --fix FIX_DIR [--mutant NAME
 
 # Check for oracle content leakage into a workspace
 python3 tools/oracle leakcheck WORKSPACE
+
+# Create a draft case (scaffold for learning from mistakes)
+python3 tools/oracle capture CASE_ID --why TEXT --task-class CLASS --runtime node-vm|python|browser \
+    [--suite tuning|heldout] [--origin-repo OWNER/REPO] [--base-commit SHA] \
+    [--raw-commit SHA] [--fix-commit SHA] [--issue REF] [--pr REF] \
+    [--run-id ID] [--model NAME] [--route NAME] [--failure-class CLASS]
+
+# Show ledger records
+python3 tools/oracle ledger [--repeats]
 ```
 
 ### Commands
@@ -34,6 +43,8 @@ python3 tools/oracle leakcheck WORKSPACE
 - **run**: Execute a case's check against a workspace (node-vm or python runtime)
 - **validate**: Enforce admission procedure: raw must FAIL, fix must PASS, all mutants must FAIL (at least 2)
 - **leakcheck**: Detect if a workspace path or files overlap with oracle-controlled content
+- **capture**: Create a draft case for a local-model output that was wrong; scaffolds task.md, manifest.json (status: draft), and appends to ledger
+- **ledger**: Show all ledger records; `--repeats` shows only signatures that occur at least twice
 
 ### Examples
 
@@ -56,4 +67,21 @@ python3 tools/oracle validate 264-root-reaction-sign \
 
 # Check workspace for oracle content
 python3 tools/oracle leakcheck /path/to/workspace
+
+# Create a draft case for a mistake
+python3 tools/oracle capture 268-my-bug \
+    --why "Root reaction sign was computed incorrectly due to order of operations" \
+    --task-class "bug" \
+    --runtime node-vm \
+    --failure-class "logic_error" \
+    --origin-repo "owner/repo" \
+    --base-commit "abc123" \
+    --raw-commit "def456" \
+    --fix-commit "ghi789"
+
+# Show ledger records
+python3 tools/oracle ledger
+
+# Show only repeated signatures
+python3 tools/oracle ledger --repeats
 ```

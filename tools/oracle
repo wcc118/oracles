@@ -27,7 +27,7 @@ RESTRICTED_DIRS = ["cases/*/oracle/", "cases/*/validation/", "registry/", "ledge
 # Standard library validators
 ENUM_VALIDATORS = {
     "strength": ["invariant-or-residual", "independent-reference", "converged-and-reviewed", "golden-master", "validated-against-data"],
-    "status": ["probation", "active", "retired"],
+    "status": ["probation", "active", "retired", "draft"],
     "suite": ["tuning", "heldout"],
     "runtime": ["python", "node-vm", "browser"],
 }
@@ -168,25 +168,49 @@ def load_manifest(case_id):
         except jsonschema.ValidationError as e:
             return None, f"jsonschema validation error in {case_id}: {e.message}"
 
-    # Verify hashes
+    # Verify hashes (skip pending fields for draft cases)
     hashes = data.get("hashes", {})
     task_hash = hashes.get("task")
     check_hash = hashes.get("check")
+    status = data.get("status")
 
     task_path = CASES_DIR / case_id / "task.md"
     check_path = CASES_DIR / case_id / "oracle" / "check.mjs"
     if not check_path.exists():
         check_path = CASES_DIR / case_id / "oracle" / "check.py"
 
-    if task_hash:
-        actual_task = hash_file(task_path)
-        if actual_task != task_hash:
-            return None, f"hash mismatch in {case_id}: task.md expected {task_hash}, got {actual_task}"
+    # Skip hash verification for draft cases with pending fields
+    if status != "draft":
+        # Non-draft cases: hash fields should not be "pending"
+        if task_hash == "pending":
+            return None, f"non-draft case {case_id} has pending hash for task.md (expected actual hash)"
+        if check_hash == "pending":
+            return None, f"non-draft case {case_id} has pending hash for oracle/check.* (expected actual hash)"
 
-    if check_hash:
-        actual_check = hash_file(check_path)
-        if actual_check != check_hash:
-            return None, f"hash mismatch in {case_id}: oracle/check.* expected {check_hash}, got {actual_check}"
+        if task_hash:
+            actual_task = hash_file(task_path)
+            if actual_task != task_hash:
+                return None, f"hash mismatch in {case_id}: task.md expected {task_hash}, got {actual_task}"
+
+        if check_hash:
+            actual_check = hash_file(check_path)
+            if actual_check != check_hash:
+                return None, f"hash mismatch in {case_id}: oracle/check.* expected {check_hash}, got {actual_check}"
+    else:
+        # Draft cases: skip verification of pending fields
+        if task_hash == "pending":
+            pass  # OK for draft
+        elif task_hash:
+            actual_task = hash_file(task_path)
+            if actual_task != task_hash:
+                return None, f"hash mismatch in {case_id}: task.md expected {task_hash}, got {actual_task}"
+
+        if check_hash == "pending":
+            pass  # OK for draft
+        elif check_hash:
+            actual_check = hash_file(check_path)
+            if actual_check != check_hash:
+                return None, f"hash mismatch in {case_id}: oracle/check.* expected {check_hash}, got {actual_check}"
 
     return data, None
 
@@ -217,6 +241,227 @@ def get_oracle_commit():
     except Exception:
         pass
     return "unknown"
+
+
+def is_valid_case_id(case_id):
+    """Check if case_id is valid: letters, digits, ., _, -, 1-80 chars, starts with letter/digit."""
+    if not case_id or len(case_id) > 80:
+        return False
+    pattern = r'^[a-zA-Z0-9][a-zA-Z0-9._-]*$'
+    return bool(re.match(pattern, case_id))
+
+
+def normalize_whitespace(text):
+    """Normalize whitespace: collapse multiple spaces, strip leading/trailing."""
+    return ' '.join(text.split())
+
+
+def compute_signature(task_class, failure_class, why):
+    """Compute SHA-256 signature for ledger record."""
+    normalized_why = normalize_whitespace(why)
+    sig_input = f"{task_class.lower()}{failure_class.lower()}{normalized_why}"
+    return hashlib.sha256(sig_input.encode('utf-8')).hexdigest()
+
+
+def get_ledger_path():
+    """Get the ledger captures.jsonl path."""
+    return ROOT_DIR / "ledger" / "captures.jsonl"
+
+
+def load_ledger_records():
+    """Load all ledger records. Returns list of (line_num, record_or_error) tuples."""
+    ledger_path = get_ledger_path()
+    records = []
+    if not ledger_path.exists():
+        return records
+    try:
+        with open(ledger_path, 'r', encoding='utf-8') as f:
+            for line_num, line in enumerate(f, 1):
+                line = line.strip()
+                if not line:
+                    continue
+                try:
+                    record = json.loads(line)
+                    records.append((line_num, record))
+                except json.JSONDecodeError as e:
+                    records.append((line_num, {"error": str(e), "line": line}))
+    except Exception:
+        pass
+    return records
+
+
+def write_ledger_record(record):
+    """Append a record to the ledger file."""
+    ledger_path = get_ledger_path()
+    ledger_path.parent.mkdir(parents=True, exist_ok=True)
+    with open(ledger_path, 'a', encoding='utf-8') as f:
+        f.write(json.dumps(record, ensure_ascii=False) + '\n')
+
+
+def count_signature_repeats(signature):
+    """Count how many times a signature appears in the ledger."""
+    records = load_ledger_records()
+    count = 0
+    for line_num, record in records:
+        if isinstance(record, dict) and record.get("signature") == signature:
+            count += 1
+    return count
+
+
+def capture_case(case_id, why, task_class, runtime, suite, origin_repo, base_commit,
+                 raw_commit, fix_commit, issue, pr, run_id, model, route, failure_class):
+    """Create a draft case with the given metadata."""
+    # Validate case_id
+    if not case_id:
+        print("Error: CASE_ID is required", file=sys.stderr)
+        return 2
+    if not is_valid_case_id(case_id):
+        print(f"Error: CASE_ID must be letters, digits, '.', '_', '-', 1-80 chars, starting with letter/digit", file=sys.stderr)
+        return 2
+
+    # Validate why
+    if not why:
+        print("Error: --why is required", file=sys.stderr)
+        return 2
+    if len(why) > 1000:
+        print(f"Error: --why must be at most 1000 characters (got {len(why)})", file=sys.stderr)
+        return 2
+
+    # Validate task_class
+    if not task_class:
+        print("Error: --task-class is required", file=sys.stderr)
+        return 2
+
+    # Validate runtime
+    if runtime not in ENUM_VALIDATORS["runtime"]:
+        print(f"Error: --runtime must be one of {ENUM_VALIDATORS['runtime']}", file=sys.stderr)
+        return 2
+
+    # Validate suite
+    if suite not in ENUM_VALIDATORS["suite"]:
+        print(f"Error: --suite must be one of {ENUM_VALIDATORS['suite']}", file=sys.stderr)
+        return 2
+
+    # Check case doesn't already exist
+    case_dir = CASES_DIR / case_id
+    if case_dir.exists():
+        print(f"Error: case '{case_id}' already exists", file=sys.stderr)
+        return 2
+
+    # Compute signature
+    sig = compute_signature(task_class, failure_class or "", why)
+
+    # Count repeats
+    repeat_count = count_signature_repeats(sig) + 1
+
+    # Create case directory structure
+    case_dir.mkdir(parents=True, exist_ok=True)
+    (case_dir / "oracle").mkdir(exist_ok=True)
+    (case_dir / "oracle" / ".gitkeep").write_text("")
+
+    # Write task.md
+    task_content = f"""# {why[:100]}
+
+## Why
+{why}
+
+## References
+"""
+    refs = []
+    if origin_repo:
+        refs.append(f"- origin-repo: {origin_repo}")
+    if base_commit:
+        refs.append(f"- base-commit: {base_commit}")
+    if raw_commit:
+        refs.append(f"- raw-commit: {raw_commit}")
+    if fix_commit:
+        refs.append(f"- fix-commit: {fix_commit}")
+    if issue:
+        refs.append(f"- issue: {issue}")
+    if pr:
+        refs.append(f"- pr: {pr}")
+    if run_id:
+        refs.append(f"- run-id: {run_id}")
+    if model:
+        refs.append(f"- model: {model}")
+    if route:
+        refs.append(f"- route: {route}")
+    if failure_class:
+        refs.append(f"- failure-class: {failure_class}")
+    task_content += '\n'.join(refs) + '\n'
+
+    task_path = case_dir / "task.md"
+    task_path.write_text(task_content, encoding='utf-8')
+    task_hash = hash_file(task_path)
+
+    # Create manifest
+    manifest = {
+        "id": case_id,
+        "task_class": task_class,
+        "runtime": runtime,
+        "strength": "invariant-or-residual",  # Default for draft
+        "status": "draft",
+        "suite": suite,
+        "hashes": {
+            "input": "pending",
+            "task": task_hash,
+            "check": "pending"
+        },
+        "origin": {}
+    }
+    # Add origin fields if provided
+    origin = {}
+    if origin_repo:
+        origin["origin-repo"] = origin_repo
+    if base_commit:
+        origin["base-commit"] = base_commit
+    if raw_commit:
+        origin["raw-commit"] = raw_commit
+    if fix_commit:
+        origin["fix-commit"] = fix_commit
+    if issue:
+        origin["issue"] = issue
+    if pr:
+        origin["pr"] = pr
+    if run_id:
+        origin["run-id"] = run_id
+    if model:
+        origin["failing-model"] = model
+    if route:
+        origin["failing-route"] = route
+    if failure_class:
+        origin["failure-class"] = failure_class
+    if origin:
+        manifest["origin"] = origin
+
+    manifest_path = case_dir / "manifest.json"
+    manifest_path.write_text(json.dumps(manifest, indent=2) + '\n', encoding='utf-8')
+
+    # Write ledger record
+    now = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
+    record = {
+        "id": f"{now}_{case_id}",
+        "timestamp": now,
+        "case_id": case_id,
+        "task_class": task_class,
+        "failure_class": failure_class or "",
+        "runtime": runtime,
+        "why": why,
+        "signature": sig,
+        "repeat_count": repeat_count
+    }
+    # Add origin fields to ledger record
+    if origin:
+        record["origin"] = origin
+
+    write_ledger_record(record)
+
+    print(f"Created draft case '{case_id}'")
+    print(f"  - task: {task_path}")
+    print(f"  - manifest: {manifest_path}")
+    print(f"  - ledger record: signature={sig[:16]}..., repeat_count={repeat_count}")
+
+    return 0
 
 
 def list_cases(suite=None, status=None):
@@ -252,11 +497,70 @@ def list_cases(suite=None, status=None):
         print(f"{cid:<30} {runtime:<12} {strength:<25} {stat:<12} {suite_name:<10}")
 
 
+def ledger_command(repeats=False):
+    """Print ledger records or repeat signatures."""
+    records = load_ledger_records()
+
+    if repeats:
+        # Count signatures
+        sig_counts = {}
+        for line_num, record in records:
+            if isinstance(record, dict) and "signature" in record:
+                sig = record["signature"]
+                sig_counts[sig] = sig_counts.get(sig, 0) + 1
+
+        # Print only signatures with count >= 2
+        found_any = False
+        for sig, count in sorted(sig_counts.items()):
+            if count >= 2:
+                found_any = True
+                # Find case_id for this signature
+                case_ids = []
+                for line_num, record in records:
+                    if isinstance(record, dict) and record.get("signature") == sig:
+                        case_ids.append(record.get("case_id", "unknown"))
+                print(f"signature={sig[:16]}... case={' '.join(case_ids)} count={count}")
+
+        if not found_any:
+            print("No repeat signatures found")
+            return 0
+        return 0
+
+    # Print all records
+    if not records:
+        print("No ledger records found")
+        return 0
+
+    print(f"{'ID':<40} {'Timestamp':<20} {'Case':<20} {'Task Class':<20} {'Repeat'}")
+    print("-" * 100)
+
+    for line_num, record in records:
+        if isinstance(record, dict) and "error" in record:
+            # Malformed line
+            err_msg = record.get("error", "unknown error")
+            print(f"LINE {line_num}: malformed - {err_msg}")
+        elif isinstance(record, dict):
+            case_id = record.get("case_id", "")
+            task_class = record.get("task_class", "")
+            repeat = record.get("repeat_count", 1)
+            # Extract just the timestamp portion for display
+            timestamp = record.get("timestamp", "")
+            rec_id = record.get("id", "")
+            print(f"{rec_id:<40} {timestamp:<20} {case_id:<20} {task_class:<20} {repeat}")
+
+    return 0
+
+
 def run_case(case_id, workspace, runtime=None, timeout=120, json_output=False):
     """Run a case check against a workspace."""
     manifest, err = load_manifest(case_id)
     if err:
         print(json.dumps({"ok": False, "error": err}), file=sys.stderr)
+        return 2
+
+    # Reject draft cases
+    if manifest.get("status") == "draft":
+        print(json.dumps({"ok": False, "error": "draft case, no oracle yet"}), file=sys.stderr)
         return 2
 
     # Use manifest runtime if not specified
@@ -347,6 +651,11 @@ def validate_case(case_id, raw_dir, fix_dir, mutants=None, write=False):
     if err:
         print(f"Error: {err}", file=sys.stderr)
         return 1
+
+    # Reject draft cases
+    if manifest.get("status") == "draft":
+        print(f"Error: draft case, no oracle yet", file=sys.stderr)
+        return 2
 
     check_path = CASES_DIR / case_id / "oracle" / "check.mjs"
     if not check_path.exists():
@@ -607,7 +916,7 @@ def main():
     # list command
     list_parser = subparsers.add_parser("list", help="List cases")
     list_parser.add_argument("--suite", choices=["tuning", "heldout"], help="Filter by suite")
-    list_parser.add_argument("--status", choices=["probation", "active", "retired"], help="Filter by status")
+    list_parser.add_argument("--status", choices=["probation", "active", "retired", "draft"], help="Filter by status")
 
     # run command
     run_parser = subparsers.add_parser("run", help="Run a case check")
@@ -629,10 +938,52 @@ def main():
     leakcheck_parser = subparsers.add_parser("leakcheck", help="Check for oracle leakage")
     leakcheck_parser.add_argument("workspace", help="Workspace directory")
 
+    # capture command
+    capture_parser = subparsers.add_parser("capture", help="Create a draft case")
+    capture_parser.add_argument("case_id", help="Case ID")
+    capture_parser.add_argument("--why", required=True, help="Why this case was created (required, max 1000 chars)")
+    capture_parser.add_argument("--task-class", required=True, help="Task class (e.g., 'bug', 'test')")
+    capture_parser.add_argument("--runtime", choices=["python", "node-vm", "browser"], default="node-vm", help="Runtime")
+    capture_parser.add_argument("--suite", choices=["tuning", "heldout"], default="tuning", help="Suite")
+    capture_parser.add_argument("--origin-repo", help="Origin repository (e.g., OWNER/REPO)")
+    capture_parser.add_argument("--base-commit", help="Base commit SHA")
+    capture_parser.add_argument("--raw-commit", help="Raw commit SHA")
+    capture_parser.add_argument("--fix-commit", help="Fix commit SHA")
+    capture_parser.add_argument("--issue", help="Issue reference (e.g., wcc118/oracles#3)")
+    capture_parser.add_argument("--pr", help="PR reference")
+    capture_parser.add_argument("--run-id", help="Run ID")
+    capture_parser.add_argument("--model", help="Model name")
+    capture_parser.add_argument("--route", help="Route name")
+    capture_parser.add_argument("--failure-class", help="Failure class")
+
+    # ledger command
+    ledger_parser = subparsers.add_parser("ledger", help="Show ledger records")
+    ledger_parser.add_argument("--repeats", action="store_true", help="Show only repeat signatures")
+
     args = parser.parse_args()
 
     if args.command == "list":
         list_cases(suite=args.suite, status=args.status)
+    elif args.command == "capture":
+        exit(capture_case(
+            case_id=args.case_id,
+            why=args.why,
+            task_class=args.task_class,
+            runtime=args.runtime,
+            suite=args.suite,
+            origin_repo=args.origin_repo,
+            base_commit=args.base_commit,
+            raw_commit=args.raw_commit,
+            fix_commit=args.fix_commit,
+            issue=args.issue,
+            pr=args.pr,
+            run_id=args.run_id,
+            model=args.model,
+            route=args.route,
+            failure_class=args.failure_class
+        ))
+    elif args.command == "ledger":
+        exit(ledger_command(repeats=args.repeats))
     elif args.command == "run":
         exit(run_case(args.case, args.workspace, args.runtime, args.timeout, args.json))
     elif args.command == "validate":
