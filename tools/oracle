@@ -226,6 +226,123 @@ def hash_file(path):
         return None
 
 
+def has_executing_marker(check_source):
+    """Check if the check source contains any executing markers."""
+    exec_markers = [
+        "vm.runInContext",
+        "vm.runInNewContext",
+        "vm.runInThisContext",
+        "new vm.Script",
+        "new Function(",
+        "eval(",
+    ]
+    for marker in exec_markers:
+        if marker in check_source:
+            return True
+    # Check for dynamic import of non-literal path (variable/expression, not string literal)
+    # Match import(expr) where expr is NOT a string literal
+    import_pattern = r"import\(\s*(?![\"\']).+?(?![\"\'])\s*\)"
+    if re.search(import_pattern, check_source):
+        return True
+    return False
+
+
+def is_text_matching_check(check_source):
+    """Check if the check is text-matching (uses String.includes/regex on source without meaningful execution).
+
+    A check is "text-matching" if:
+    1. It has executing markers (vm.Script, etc.)
+    2. BUT those markers do NOT actually execute the workspace source variable
+    3. AND it has 3+ text pattern calls (.includes/.match/.test) on the source variable
+
+    If the check has executing markers AND those markers actually run the workspace source code,
+    then text-matching patterns on that source are acceptable (the check is executing).
+    """
+    includes_count = check_source.count(".includes(")
+    match_count = len(re.findall(r'\.match\s*\(', check_source))
+    test_count = len(re.findall(r'\.test\s*\(', check_source))
+
+    total = includes_count + match_count + test_count
+
+    # If no text patterns, not text-matching by this heuristic
+    if total < 3:
+        return False
+
+    # Check if the check has a source variable and if vm.Script runs that variable
+    # Look for patterns like: const source = ...; new vm.Script(source) or new vm.Script(code).run...
+    source_var_patterns = [
+        r'const\s+source\s*=\s*.*?fs\.readFileSync',
+        r'let\s+source\s*=\s*.*?fs\.readFileSync',
+        r'const\s+code\s*=\s*.*?fs\.readFileSync',
+        r'let\s+code\s*=\s*.*?fs\.readFileSync',
+    ]
+
+    has_source_var = any(re.search(p, check_source) for p in source_var_patterns)
+
+    # Check if workspace source is actually executed
+    executes_source = False
+    # Pattern: new vm.Script(VAR).runIn... or vm.runInContext(code, ...)
+    execute_patterns = [
+        r'new vm\.Script\s*\(\s*(?:source|code)\s*\)\.runIn',
+        r'vm\.runInContext\s*\(\s*(?:source|code)',
+        r'vm\.runInNewContext\s*\(\s*(?:source|code)',
+        r'vm\.runInThisContext\s*\(\s*(?:source|code)',
+    ]
+    for pattern in execute_patterns:
+        if re.search(pattern, check_source):
+            executes_source = True
+            break
+
+    # If source is not actually executed, this is text-matching
+    if not executes_source and has_source_var:
+        return True
+
+    return False
+
+
+def lint_no_exec(check_path):
+    """Lint a node-vm check for non-executing or text-matching patterns.
+
+    Returns (exit_code, message) tuple. Exit 0 if valid, exit 2 with message if invalid.
+    """
+    if not check_path.exists():
+        return 2, "check file not found"
+
+    check_source = check_path.read_text(encoding="utf-8")
+
+    # Check if it's a node-vm check (has any executing marker)
+    if not has_executing_marker(check_source):
+        return 2, "non-executing check: no vm.runIn*, new vm.Script, eval, new Function, or dynamic import found"
+
+    # Check if it's text-matching (3+ text patterns on workspace source)
+    if is_text_matching_check(check_source):
+        return 2, "text-matching check: uses String.includes or regex on source without executing workspace code"
+
+    return 0, ""
+
+
+def classify_mutant_failure(result):
+    """Classify a mutant failure as behavioral or structural.
+
+    A failing mutant run is `structural` if the JSON `reason` or `error` text contains
+    `not found` or `unexpected structure` or the exit code is 2; otherwise `behavioral`.
+    Only `behavioral` failures count toward the >=2 mutant requirement.
+    """
+    exit_code = result.get("exit_code", 0)
+    reason = result.get("reason", "")
+    error = result.get("error", "")
+
+    # Structural indicators
+    if exit_code == 2:
+        return "structural"
+
+    reason_lower = (reason + error).lower()
+    if "not found" in reason_lower or "unexpected structure" in reason_lower:
+        return "structural"
+
+    return "behavioral"
+
+
 def get_oracle_commit():
     """Get the current git commit hash of the oracle repo."""
     try:
@@ -682,6 +799,14 @@ def validate_case(case_id, raw_dir, fix_dir, mutants=None, write=False):
         print(f"Error: check not found: {check_path}", file=sys.stderr)
         return 1
 
+    # Run no-exec lint for node-vm checks
+    runtime = manifest.get("runtime", "")
+    if runtime == "node-vm":
+        lint_exit, lint_msg = lint_no_exec(check_path)
+        if lint_exit != 0:
+            print(f"Validation FAILED: {lint_msg}", file=sys.stderr)
+            return 2
+
     results = {}
 
     # Run on raw (should FAIL)
@@ -719,6 +844,25 @@ def validate_case(case_id, raw_dir, fix_dir, mutants=None, write=False):
         if r["exit_code"] != 1:
             errors.append(f"{name}: expected exit 1 (fail), got {r['exit_code']}")
 
+    # Count behavioral vs structural mutant failures
+    behavioral_count = 0
+    structural_count = 0
+    for name, r in results.items():
+        if name in ("raw", "fix"):
+            continue
+        if r["exit_code"] == 1:  # Failed mutant
+            classification = classify_mutant_failure(r)
+            if classification == "behavioral":
+                behavioral_count += 1
+            else:
+                structural_count += 1
+
+    # The >=2 mutant requirement only counts behavioral failures
+    failed_mutants = behavioral_count
+
+    if failed_mutants < 2:
+        errors.append(f"mutants: at least 2 behavioral must fail, only {failed_mutants} failed (structural: {structural_count})")
+
     # Print table
     print(f"{'Workspace':<15} {'Exit':<6} {'OK':<6} {'Result'}")
     print("-" * 70)
@@ -743,11 +887,16 @@ def validate_case(case_id, raw_dir, fix_dir, mutants=None, write=False):
             "timestamp": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
             "commit": get_oracle_commit(),
             "results": results,
-            "verdict": verdict
+            "verdict": verdict,
+            "mutant_failures": {
+                "behavioral": behavioral_count,
+                "structural": structural_count
+            }
         }
         with open(report_dir / "report.json", "w") as f:
             json.dump(report, f, indent=2)
         print(f"\nReport written to {report_dir / 'report.json'}")
+        print(f"Mutant failure breakdown: behavioral={behavioral_count}, structural={structural_count}")
 
     return 0 if verdict else 1
 
