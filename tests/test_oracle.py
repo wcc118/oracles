@@ -1722,6 +1722,31 @@ class TestCaptureCommand:
         assert first["signature"] == second["signature"]
         assert (first["repeat_count"], second["repeat_count"]) == (1, 2)
 
+    def test_capture_prints_repeat_of_message_naming_the_first_case(self, tmp_path):
+        """Criterion 4: a repeated signature prints 'repeat of <first case id> (count N)'; the first capture does not."""
+        repo = _tmp_repo(tmp_path)
+        def cap(case_id, why):
+            return _run_tmp(repo, "capture", case_id, "--why", why, "--task-class", "ui",
+                            "--runtime", "python", "--failure-class", "sign")
+        first = cap("case-a", "Root reaction shown with wrong sign")
+        second = cap("case-b", "root REACTION shown with wrong sign")
+        third = cap("case-c", "Root reaction  shown with wrong SIGN")
+        for r in (first, second, third):
+            assert r.returncode == 0, r.stderr
+        assert "repeat of" not in first.stdout
+        assert "repeat of case-a (count 2)" in second.stdout
+        assert "repeat of case-a (count 3)" in third.stdout
+
+    def test_capture_different_signature_prints_no_repeat_message(self, tmp_path):
+        """Control: same task class but a different failure class is not a repeat, so no message."""
+        repo = _tmp_repo(tmp_path)
+        a = _run_tmp(repo, "capture", "case-a", "--why", "same words", "--task-class", "ui",
+                     "--runtime", "python", "--failure-class", "sign")
+        b = _run_tmp(repo, "capture", "case-b", "--why", "same words", "--task-class", "ui",
+                     "--runtime", "python", "--failure-class", "units")
+        assert a.returncode == 0 and b.returncode == 0
+        assert "repeat of" not in a.stdout and "repeat of" not in b.stdout
+
     def test_capture_signature_fields_are_separated(self, tmp_path):
         """("ab","c") and ("a","bc") concatenate identically without a separator; they must not collide."""
         repo = _tmp_repo(tmp_path)

@@ -304,6 +304,14 @@ def write_ledger_record(record):
         f.write(json.dumps(record, ensure_ascii=False) + '\n')
 
 
+def first_case_for_signature(signature):
+    """Return the case id of the earliest ledger record with this signature, or None."""
+    for line_num, record in load_ledger_records():
+        if isinstance(record, dict) and record.get("signature") == signature:
+            return record.get("case_id")
+    return None
+
+
 def count_signature_repeats(signature):
     """Count how many times a signature appears in the ledger."""
     records = load_ledger_records()
@@ -357,8 +365,9 @@ def capture_case(case_id, why, task_class, runtime, suite, origin_repo, base_com
     # Compute signature
     sig = compute_signature(task_class, failure_class or "", why)
 
-    # Count repeats
+    # Count repeats (and remember which case first recorded this signature)
     repeat_count = count_signature_repeats(sig) + 1
+    first_case = first_case_for_signature(sig) if repeat_count > 1 else None
 
     # Create case directory structure
     case_dir.mkdir(parents=True, exist_ok=True)
@@ -466,6 +475,8 @@ def capture_case(case_id, why, task_class, runtime, suite, origin_repo, base_com
     print(f"  - task: {task_path}")
     print(f"  - manifest: {manifest_path}")
     print(f"  - ledger record: signature={sig[:16]}..., repeat_count={repeat_count}")
+    if repeat_count > 1:
+        print(f"repeat of {first_case} (count {repeat_count})")
 
     return 0
 
