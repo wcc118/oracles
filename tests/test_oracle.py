@@ -1,6 +1,7 @@
 """Tests for the oracle CLI tool."""
 import hashlib
 import json
+import os
 import shutil
 import subprocess
 import sys
@@ -65,6 +66,354 @@ class TestManifestLoading:
         assert result.returncode == 0
         # No active cases exist
         assert "264-root-reaction-sign" not in result.stdout
+
+
+class TestManifestValidation:
+    """Tests for manifest validation without jsonschema."""
+
+    def test_list_with_invalid_enum_strength(self, tmp_path):
+        """Test list rejects invalid enum on strength without jsonschema."""
+        case_dir = tmp_path / "invalid-strength"
+        case_dir.mkdir()
+        oracle_dir = case_dir / "oracle"
+        oracle_dir.mkdir()
+
+        check_file = oracle_dir / "check.mjs"
+        check_file.write_text("console.log(JSON.stringify({ok:true}));")
+
+        task_file = case_dir / "task.md"
+        task_file.write_text("# Task")
+
+        task_hash = hash_file(task_file)
+        check_hash = hash_file(check_file)
+
+        manifest = {
+            "id": "invalid-strength",
+            "task_class": "test",
+            "runtime": "node-vm",
+            "strength": "totally-bogus",
+            "status": "probation",
+            "suite": "tuning",
+            "hashes": {
+                "input": "test",
+                "task": task_hash,
+                "check": check_hash
+            },
+            "origin": {"issue": "test"}
+        }
+        (case_dir / "manifest.json").write_text(json.dumps(manifest))
+
+        dest_case = CASES_DIR / "invalid-strength"
+        if dest_case.exists():
+            shutil.rmtree(dest_case)
+        shutil.copytree(case_dir, dest_case)
+
+        try:
+            # Run with jsonschema blocked
+            import subprocess
+            nojs_dir = tmp_path / "nojs"
+            nojs_dir.mkdir()
+            (nojs_dir / "jsonschema.py").write_text('raise ImportError("blocked")\n')
+
+            result = subprocess.run(
+                [sys.executable, str(ORACLE_SCRIPT), "list"],
+                capture_output=True,
+                text=True,
+                timeout=60,
+                cwd=str(ROOT_DIR),
+                env={**os.environ, "PYTHONPATH": str(nojs_dir)}
+            )
+            assert result.returncode == 0
+            assert "invalid-strength" not in result.stdout
+            assert "invalid enum value 'totally-bogus' for field 'strength'" in result.stderr
+        finally:
+            if dest_case.exists():
+                shutil.rmtree(dest_case)
+
+    def test_list_with_invalid_enum_runtime(self, tmp_path):
+        """Test list rejects invalid enum on runtime without jsonschema."""
+        case_dir = tmp_path / "invalid-runtime"
+        case_dir.mkdir()
+        oracle_dir = case_dir / "oracle"
+        oracle_dir.mkdir()
+
+        check_file = oracle_dir / "check.mjs"
+        check_file.write_text("console.log(JSON.stringify({ok:true}));")
+
+        task_file = case_dir / "task.md"
+        task_file.write_text("# Task")
+
+        task_hash = hash_file(task_file)
+        check_hash = hash_file(check_file)
+
+        manifest = {
+            "id": "invalid-runtime",
+            "task_class": "test",
+            "runtime": "totally-bogus",
+            "strength": "invariant-or-residual",
+            "status": "probation",
+            "suite": "tuning",
+            "hashes": {
+                "input": "test",
+                "task": task_hash,
+                "check": check_hash
+            },
+            "origin": {"issue": "test"}
+        }
+        (case_dir / "manifest.json").write_text(json.dumps(manifest))
+
+        dest_case = CASES_DIR / "invalid-runtime"
+        if dest_case.exists():
+            shutil.rmtree(dest_case)
+        shutil.copytree(case_dir, dest_case)
+
+        try:
+            import subprocess
+            nojs_dir = tmp_path / "nojs"
+            nojs_dir.mkdir()
+            (nojs_dir / "jsonschema.py").write_text('raise ImportError("blocked")\n')
+
+            result = subprocess.run(
+                [sys.executable, str(ORACLE_SCRIPT), "list"],
+                capture_output=True,
+                text=True,
+                timeout=60,
+                cwd=str(ROOT_DIR),
+                env={**os.environ, "PYTHONPATH": str(nojs_dir)}
+            )
+            assert result.returncode == 0
+            assert "invalid-runtime" not in result.stdout
+            assert "invalid enum value 'totally-bogus' for field 'runtime'" in result.stderr
+        finally:
+            if dest_case.exists():
+                shutil.rmtree(dest_case)
+
+    def test_list_with_invalid_enum_status(self, tmp_path):
+        """Test list rejects invalid enum on status without jsonschema."""
+        case_dir = tmp_path / "invalid-status"
+        case_dir.mkdir()
+        oracle_dir = case_dir / "oracle"
+        oracle_dir.mkdir()
+
+        check_file = oracle_dir / "check.mjs"
+        check_file.write_text("console.log(JSON.stringify({ok:true}));")
+
+        task_file = case_dir / "task.md"
+        task_file.write_text("# Task")
+
+        task_hash = hash_file(task_file)
+        check_hash = hash_file(check_file)
+
+        manifest = {
+            "id": "invalid-status",
+            "task_class": "test",
+            "runtime": "node-vm",
+            "strength": "invariant-or-residual",
+            "status": "totally-bogus",
+            "suite": "tuning",
+            "hashes": {
+                "input": "test",
+                "task": task_hash,
+                "check": check_hash
+            },
+            "origin": {"issue": "test"}
+        }
+        (case_dir / "manifest.json").write_text(json.dumps(manifest))
+
+        dest_case = CASES_DIR / "invalid-status"
+        if dest_case.exists():
+            shutil.rmtree(dest_case)
+        shutil.copytree(case_dir, dest_case)
+
+        try:
+            import subprocess
+            nojs_dir = tmp_path / "nojs"
+            nojs_dir.mkdir()
+            (nojs_dir / "jsonschema.py").write_text('raise ImportError("blocked")\n')
+
+            result = subprocess.run(
+                [sys.executable, str(ORACLE_SCRIPT), "list"],
+                capture_output=True,
+                text=True,
+                timeout=60,
+                cwd=str(ROOT_DIR),
+                env={**os.environ, "PYTHONPATH": str(nojs_dir)}
+            )
+            assert result.returncode == 0
+            assert "invalid-status" not in result.stdout
+            assert "invalid enum value 'totally-bogus' for field 'status'" in result.stderr
+        finally:
+            if dest_case.exists():
+                shutil.rmtree(dest_case)
+
+    def test_list_with_invalid_enum_suite(self, tmp_path):
+        """Test list rejects invalid enum on suite without jsonschema."""
+        case_dir = tmp_path / "invalid-suite"
+        case_dir.mkdir()
+        oracle_dir = case_dir / "oracle"
+        oracle_dir.mkdir()
+
+        check_file = oracle_dir / "check.mjs"
+        check_file.write_text("console.log(JSON.stringify({ok:true}));")
+
+        task_file = case_dir / "task.md"
+        task_file.write_text("# Task")
+
+        task_hash = hash_file(task_file)
+        check_hash = hash_file(check_file)
+
+        manifest = {
+            "id": "invalid-suite",
+            "task_class": "test",
+            "runtime": "node-vm",
+            "strength": "invariant-or-residual",
+            "status": "probation",
+            "suite": "totally-bogus",
+            "hashes": {
+                "input": "test",
+                "task": task_hash,
+                "check": check_hash
+            },
+            "origin": {"issue": "test"}
+        }
+        (case_dir / "manifest.json").write_text(json.dumps(manifest))
+
+        dest_case = CASES_DIR / "invalid-suite"
+        if dest_case.exists():
+            shutil.rmtree(dest_case)
+        shutil.copytree(case_dir, dest_case)
+
+        try:
+            import subprocess
+            nojs_dir = tmp_path / "nojs"
+            nojs_dir.mkdir()
+            (nojs_dir / "jsonschema.py").write_text('raise ImportError("blocked")\n')
+
+            result = subprocess.run(
+                [sys.executable, str(ORACLE_SCRIPT), "list"],
+                capture_output=True,
+                text=True,
+                timeout=60,
+                cwd=str(ROOT_DIR),
+                env={**os.environ, "PYTHONPATH": str(nojs_dir)}
+            )
+            assert result.returncode == 0
+            assert "invalid-suite" not in result.stdout
+            assert "invalid enum value 'totally-bogus' for field 'suite'" in result.stderr
+        finally:
+            if dest_case.exists():
+                shutil.rmtree(dest_case)
+
+    def test_list_with_wrong_type_hashes(self, tmp_path):
+        """Test list rejects wrong type for hashes (string instead of object)."""
+        case_dir = tmp_path / "wrong-type-hashes"
+        case_dir.mkdir()
+        oracle_dir = case_dir / "oracle"
+        oracle_dir.mkdir()
+
+        check_file = oracle_dir / "check.mjs"
+        check_file.write_text("console.log(JSON.stringify({ok:true}));")
+
+        task_file = case_dir / "task.md"
+        task_file.write_text("# Task")
+
+        task_hash = hash_file(task_file)
+        check_hash = hash_file(check_file)
+
+        manifest = {
+            "id": "wrong-type-hashes",
+            "task_class": "test",
+            "runtime": "node-vm",
+            "strength": "invariant-or-residual",
+            "status": "probation",
+            "suite": "tuning",
+            "hashes": "totally-bogus-string",
+            "origin": {"issue": "test"}
+        }
+        (case_dir / "manifest.json").write_text(json.dumps(manifest))
+
+        dest_case = CASES_DIR / "wrong-type-hashes"
+        if dest_case.exists():
+            shutil.rmtree(dest_case)
+        shutil.copytree(case_dir, dest_case)
+
+        try:
+            import subprocess
+            nojs_dir = tmp_path / "nojs"
+            nojs_dir.mkdir()
+            (nojs_dir / "jsonschema.py").write_text('raise ImportError("blocked")\n')
+
+            result = subprocess.run(
+                [sys.executable, str(ORACLE_SCRIPT), "list"],
+                capture_output=True,
+                text=True,
+                timeout=60,
+                cwd=str(ROOT_DIR),
+                env={**os.environ, "PYTHONPATH": str(nojs_dir)}
+            )
+            assert result.returncode == 0
+            assert "wrong-type-hashes" not in result.stdout
+            assert "wrong type for field 'hashes'" in result.stderr
+        finally:
+            if dest_case.exists():
+                shutil.rmtree(dest_case)
+
+    def test_list_with_missing_nested_key(self, tmp_path):
+        """Test list rejects missing required nested key (hashes.check)."""
+        case_dir = tmp_path / "missing-nested-key"
+        case_dir.mkdir()
+        oracle_dir = case_dir / "oracle"
+        oracle_dir.mkdir()
+
+        check_file = oracle_dir / "check.mjs"
+        check_file.write_text("console.log(JSON.stringify({ok:true}));")
+
+        task_file = case_dir / "task.md"
+        task_file.write_text("# Task")
+
+        task_hash = hash_file(task_file)
+        check_hash = hash_file(check_file)
+
+        manifest = {
+            "id": "missing-nested-key",
+            "task_class": "test",
+            "runtime": "node-vm",
+            "strength": "invariant-or-residual",
+            "status": "probation",
+            "suite": "tuning",
+            "hashes": {
+                "input": "test",
+                "task": task_hash
+            },
+            "origin": {"issue": "test"}
+        }
+        (case_dir / "manifest.json").write_text(json.dumps(manifest))
+
+        dest_case = CASES_DIR / "missing-nested-key"
+        if dest_case.exists():
+            shutil.rmtree(dest_case)
+        shutil.copytree(case_dir, dest_case)
+
+        try:
+            import subprocess
+            nojs_dir = tmp_path / "nojs"
+            nojs_dir.mkdir()
+            (nojs_dir / "jsonschema.py").write_text('raise ImportError("blocked")\n')
+
+            result = subprocess.run(
+                [sys.executable, str(ORACLE_SCRIPT), "list"],
+                capture_output=True,
+                text=True,
+                timeout=60,
+                cwd=str(ROOT_DIR),
+                env={**os.environ, "PYTHONPATH": str(nojs_dir)}
+            )
+            assert result.returncode == 0
+            assert "missing-nested-key" not in result.stdout
+            assert "missing required nested key 'hashes.check'" in result.stderr
+        finally:
+            if dest_case.exists():
+                shutil.rmtree(dest_case)
 
 
 class TestRunCommand:
@@ -353,6 +702,71 @@ class TestLeakcheckCommand:
         result = run_oracle("leakcheck", str(ledger_dir))
         assert result.returncode == 1
         assert "restricted" in result.stdout.lower()
+
+    def test_leakcheck_symlink_to_oracle_directory(self, tmp_path):
+        """Test leakcheck with symlink to oracle directory."""
+        oracle_dir = CASES_DIR / "264-root-reaction-sign" / "oracle"
+        link_dir = tmp_path / "link"
+        link_dir.mkdir()
+        link_oracle = link_dir / "oracle_link"
+        link_oracle.symlink_to(oracle_dir)
+
+        result = run_oracle("leakcheck", str(link_dir))
+        assert result.returncode == 1
+        assert "symlink to restricted" in result.stdout.lower() or "identical" in result.stdout.lower()
+
+    def test_leakcheck_symlink_to_validation_directory(self, tmp_path):
+        """Test leakcheck with symlink to validation directory."""
+        validation_dir = CASES_DIR / "264-root-reaction-sign" / "validation"
+        link_dir = tmp_path / "link"
+        link_dir.mkdir()
+        link_validation = link_dir / "validation_link"
+        link_validation.symlink_to(validation_dir)
+
+        result = run_oracle("leakcheck", str(link_dir))
+        assert result.returncode == 1
+        assert "symlink to restricted" in result.stdout.lower() or "identical" in result.stdout.lower()
+
+    def test_leakcheck_nested_symlink_to_oracle_directory(self, tmp_path):
+        """Test leakcheck with symlink nested two levels down to oracle directory."""
+        oracle_dir = CASES_DIR / "264-root-reaction-sign" / "oracle"
+        link_dir = tmp_path / "link"
+        link_dir.mkdir()
+        nested_dir = link_dir / "nested"
+        nested_dir.mkdir()
+        deep_dir = nested_dir / "deep"
+        deep_dir.mkdir()
+        link_oracle = deep_dir / "oracle_link"
+        link_oracle.symlink_to(oracle_dir)
+
+        result = run_oracle("leakcheck", str(link_dir))
+        assert result.returncode == 1
+        assert "symlink to restricted" in result.stdout.lower() or "identical" in result.stdout.lower()
+
+    def test_leakcheck_symlink_cycle(self, tmp_path):
+        """Test leakcheck with symlink cycle (terminates, exit 0 when no leak)."""
+        link_dir = tmp_path / "link"
+        link_dir.mkdir()
+        # Create a cycle: cycle_a -> cycle_b -> cycle_a (both inside workspace)
+        cycle_a = link_dir / "cycle_a"
+        cycle_b = link_dir / "cycle_b"
+        cycle_a.symlink_to(cycle_b)
+        cycle_b.symlink_to(cycle_a)
+
+        result = run_oracle("leakcheck", str(link_dir))
+        assert result.returncode == 0
+        assert "PASSED" in result.stdout
+
+    def test_leakcheck_dangling_symlink(self, tmp_path):
+        """Test leakcheck with dangling symlink (no crash, exit 0)."""
+        link_dir = tmp_path / "link"
+        link_dir.mkdir()
+        dangling = link_dir / "dangling"
+        dangling.symlink_to("/nonexistent/file")
+
+        result = run_oracle("leakcheck", str(link_dir))
+        assert result.returncode == 0
+        assert "PASSED" in result.stdout
 
 
 class TestIntegration:

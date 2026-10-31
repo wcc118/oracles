@@ -24,11 +24,124 @@ CASES_DIR = ROOT_DIR / "cases"
 SCHEMA_FILE = ROOT_DIR / "schema" / "case.schema.json"
 RESTRICTED_DIRS = ["cases/*/oracle/", "cases/*/validation/", "registry/", "ledger/"]
 
+# Standard library validators
+ENUM_VALIDATORS = {
+    "strength": ["invariant-or-residual", "independent-reference", "converged-and-reviewed", "golden-master", "validated-against-data"],
+    "status": ["probation", "active", "retired"],
+    "suite": ["tuning", "heldout"],
+    "runtime": ["python", "node-vm", "browser"],
+}
+
+TYPE_VALIDATORS = {
+    "id": str,
+    "task_class": str,
+    "strength": str,
+    "status": str,
+    "suite": str,
+    "runtime": str,
+    "origin": dict,
+    "registry_refs": list,
+    "memory_refs": list,
+    "hashes": dict,
+    "notes": str,
+}
+
 
 def load_schema():
     """Load the case schema JSON."""
     with open(SCHEMA_FILE) as f:
         return json.load(f)
+
+
+def derive_validators_from_schema(schema):
+    """Derive enum and type validators from the schema at load time."""
+    enums = dict(ENUM_VALIDATORS)  # Start with defaults
+    types = dict(TYPE_VALIDATORS)
+    required = ["id", "task_class", "runtime", "strength", "hashes", "origin", "suite", "status"]
+
+    if schema and schema.get("type") == "object":
+        props = schema.get("properties", {})
+        required = schema.get("required", [])
+
+        for field, spec in props.items():
+            # Collect enum values
+            if "enum" in spec:
+                enums[field] = spec["enum"]
+
+            # Collect type info
+            if "type" in spec:
+                type_map = {
+                    "string": str,
+                    "integer": int,
+                    "number": (int, float),
+                    "boolean": bool,
+                    "array": list,
+                    "object": dict,
+                }
+                types[field] = type_map.get(spec["type"], str)
+
+            # Handle nested required keys
+            if "properties" in spec:
+                nested_required = spec.get("required", [])
+                for nested_field in nested_required:
+                    if nested_field in spec["properties"]:
+                        nested_spec = spec["properties"][nested_field]
+                        if "type" in nested_spec:
+                            nested_type_map = {
+                                "string": str,
+                                "integer": int,
+                                "number": (int, float),
+                                "boolean": bool,
+                                "array": list,
+                                "object": dict,
+                            }
+                            types[f"{field}.{nested_field}"] = nested_type_map.get(nested_spec["type"], str)
+
+    return enums, types, required
+
+
+# Global validators (derived at module load time)
+SCHEMA = load_schema()
+ENUM_VALIDATORS, TYPE_VALIDATORS, REQUIRED_FIELDS = derive_validators_from_schema(SCHEMA)
+
+
+def validate_manifest(manifest, case_id):
+    """Validate a manifest against derived validators. Returns error message or None."""
+    # Check required fields
+    for field in REQUIRED_FIELDS:
+        if field not in manifest:
+            return f"missing required field '{field}' in {case_id}"
+
+    # Check enum fields
+    for field, allowed_values in ENUM_VALIDATORS.items():
+        if field in manifest:
+            value = manifest[field]
+            if value not in allowed_values:
+                return f"invalid enum value '{value}' for field '{field}' in {case_id}"
+
+    # Check type fields
+    for field, expected_type in TYPE_VALIDATORS.items():
+        if field in manifest:
+            value = manifest[field]
+            if not isinstance(value, expected_type):
+                return f"wrong type for field '{field}' in {case_id} (expected {expected_type.__name__}, got {type(value).__name__})"
+
+    # Check nested hashes structure
+    if "hashes" in manifest:
+        hashes = manifest["hashes"]
+        if not isinstance(hashes, dict):
+            return f"wrong type for field 'hashes' in {case_id} (expected dict, got {type(hashes).__name__})"
+        for hash_field in ["input", "task", "check"]:
+            if hash_field not in hashes:
+                return f"missing required nested key 'hashes.{hash_field}' in {case_id}"
+
+    # Check origin structure
+    if "origin" in manifest:
+        origin = manifest["origin"]
+        if not isinstance(origin, dict):
+            return f"wrong type for field 'origin' in {case_id} (expected dict, got {type(origin).__name__})"
+
+    return None
 
 
 def load_manifest(case_id):
@@ -43,18 +156,17 @@ def load_manifest(case_id):
     except json.JSONDecodeError as e:
         return None, f"invalid JSON in {manifest_path}: {e}"
 
-    # Validate against schema
+    # Always validate against schema using standard library
+    err = validate_manifest(data, case_id)
+    if err:
+        return None, err
+
+    # jsonschema is optional additional validation
     if jsonschema:
         try:
-            jsonschema.validate(instance=data, schema=load_schema())
+            jsonschema.validate(instance=data, schema=SCHEMA)
         except jsonschema.ValidationError as e:
-            return None, f"validation error in {case_id}: {e.message}"
-
-    # Verify required fields
-    required = ["id", "task_class", "runtime", "strength", "hashes", "origin", "suite", "status"]
-    for field in required:
-        if field not in data:
-            return None, f"missing required field '{field}' in {case_id}"
+            return None, f"jsonschema validation error in {case_id}: {e.message}"
 
     # Verify hashes
     hashes = data.get("hashes", {})
@@ -352,60 +464,44 @@ def leakcheck(workspace):
     workspace_path = Path(workspace).resolve()
     leaks = []
 
-    # Check if workspace is inside restricted directories
+    # Build restricted paths set
+    restricted_paths = set()
+    restricted_files = []
+
     for pattern in RESTRICTED_DIRS:
-        # Convert glob pattern to actual path
         if pattern.startswith("cases/*/"):
-            # Check cases/*/oracle/ and cases/*/validation/
             for case_dir in CASES_DIR.glob("*/"):
                 for subdir in ["oracle", "validation"]:
                     restricted = case_dir / subdir
                     if restricted.exists():
-                        try:
-                            rel = workspace_path.relative_to(restricted.resolve())
-                            leaks.append(f"workspace inside restricted: {workspace_path} (under {restricted})")
-                        except ValueError:
-                            pass
+                        restricted_paths.add(restricted.resolve())
+                        # Collect all files under this directory (following symlinks)
+                        for f in restricted.rglob("*"):
+                            try:
+                                if f.is_file():
+                                    restricted_files.append(f.resolve())
+                            except Exception:
+                                pass
         elif pattern == "registry/":
             restricted = ROOT_DIR / "registry"
             if restricted.exists():
-                try:
-                    rel = workspace_path.relative_to(restricted.resolve())
-                    leaks.append(f"workspace inside restricted: {workspace_path} (under {restricted})")
-                except ValueError:
-                    pass
+                restricted_paths.add(restricted.resolve())
+                for f in restricted.rglob("*"):
+                    try:
+                        if f.is_file():
+                            restricted_files.append(f.resolve())
+                    except Exception:
+                        pass
         elif pattern == "ledger/":
             restricted = ROOT_DIR / "ledger"
             if restricted.exists():
-                try:
-                    rel = workspace_path.relative_to(restricted.resolve())
-                    leaks.append(f"workspace inside restricted: {workspace_path} (under {restricted})")
-                except ValueError:
-                    pass
-
-    # Check for identical-content files
-    restricted_files = []
-    for pattern in RESTRICTED_DIRS:
-        if pattern.startswith("cases/*/"):
-            for case_dir in CASES_DIR.glob("*/"):
-                for subdir in ["oracle", "validation"]:
-                    restricted_dir = case_dir / subdir
-                    if restricted_dir.exists():
-                        for f in restricted_dir.rglob("*"):
-                            if f.is_file():
-                                restricted_files.append(f)
-        elif pattern == "registry/":
-            restricted_dir = ROOT_DIR / "registry"
-            if restricted_dir.exists():
-                for f in restricted_dir.rglob("*"):
-                    if f.is_file():
-                        restricted_files.append(f)
-        elif pattern == "ledger/":
-            restricted_dir = ROOT_DIR / "ledger"
-            if restricted_dir.exists():
-                for f in restricted_dir.rglob("*"):
-                    if f.is_file():
-                        restricted_files.append(f)
+                restricted_paths.add(restricted.resolve())
+                for f in restricted.rglob("*"):
+                    try:
+                        if f.is_file():
+                            restricted_files.append(f.resolve())
+                    except Exception:
+                        pass
 
     # Compute hashes of restricted files
     restricted_hashes = {}
@@ -417,23 +513,79 @@ def leakcheck(workspace):
         except Exception:
             pass
 
-    # Check workspace files
+    # Check if workspace path itself is inside a restricted directory
+    for restricted_path in restricted_paths:
+        try:
+            rel = workspace_path.relative_to(restricted_path)
+            leaks.append(f"workspace inside restricted: {workspace_path} (under {restricted_path})")
+        except ValueError:
+            pass
+
+    # Traverse workspace, following directory symlinks safely (with cycle detection)
+    visited_real_dirs = set()
     if workspace_path.exists():
-        for f in workspace_path.rglob("*"):
-            if f.is_file() or (f.is_symlink() and f.resolve().is_file()):
+        # We need to manually walk directories to follow symlinks
+        def walk_with_symlinks(dir_path):
+            """Walk directory tree following symlinks, tracking visited real paths to avoid cycles."""
+            try:
+                real_path = dir_path.resolve()
+                # If we've already visited this real path, skip to avoid cycles
+                if real_path in visited_real_dirs:
+                    return
+                visited_real_dirs.add(real_path)
+
+                # Iterate over directory entries
                 try:
-                    if f.is_symlink():
-                        resolved = f.resolve()
-                        if resolved.is_file():
-                            h = hash_file(resolved)
-                            if h and h in restricted_hashes:
-                                leaks.append(f"identical file: {f} -> {resolved} (matches {restricted_hashes[h]})")
-                    else:
-                        h = hash_file(f)
-                        if h and h in restricted_hashes:
-                            leaks.append(f"identical file: {f} (matches {restricted_hashes[h]})")
-                except Exception:
+                    with os.scandir(dir_path) as entries:
+                        for entry in entries:
+                            try:
+                                entry_path = Path(entry.path)
+
+                                # Check if this entry is a symlink to a restricted path
+                                if entry_path.is_symlink():
+                                    try:
+                                        resolved = entry_path.resolve()
+                                        # Check if symlink points inside a restricted directory
+                                        for restricted_path in restricted_paths:
+                                            try:
+                                                rel = resolved.relative_to(restricted_path)
+                                                leaks.append(f"symlink to restricted: {entry_path} -> {resolved} (under {restricted_path})")
+                                            except ValueError:
+                                                pass
+                                        # Check if resolved path is a file with matching hash
+                                        if resolved.is_file():
+                                            h = hash_file(resolved)
+                                            if h and h in restricted_hashes:
+                                                leaks.append(f"identical file: {entry_path} -> {resolved} (matches {restricted_hashes[h]})")
+                                        # If it's a symlink to a directory, recurse into it
+                                        elif resolved.is_dir():
+                                            walk_with_symlinks(entry_path)
+                                    except (OSError, FileNotFoundError):
+                                        # Dangling symlink - skip with note
+                                        pass
+
+                                elif entry.is_dir():
+                                    # Regular directory, recurse
+                                    walk_with_symlinks(entry_path)
+
+                                elif entry.is_file():
+                                    # Regular file - check for hash match
+                                    try:
+                                        h = hash_file(entry_path)
+                                        if h and h in restricted_hashes:
+                                            leaks.append(f"identical file: {entry_path} (matches {restricted_hashes[h]})")
+                                    except Exception:
+                                        pass
+
+                            except Exception:
+                                pass
+                except (OSError, PermissionError):
                     pass
+
+            except Exception:
+                pass
+
+        walk_with_symlinks(workspace_path)
 
     if leaks:
         print("Leakcheck FAILED - offending paths:")
