@@ -1,0 +1,18 @@
+{
+  "mutants": [
+    [
+      "speed-field",
+      "numberInput('wb-in-sections-speed',150,()=>refresh(),false)",
+      "numberInput('wb-in-sections-speed',150,x=>{inputs.airspeed=x;refresh();},false)"
+    ],
+    [
+      "surface-field",
+      "onchange:()=>{if(chordOf(surface.value))",
+      "onchange:()=>{inputs.surface=surface.value;if(chordOf(surface.value))"
+    ]
+  ],
+  "alternative": [
+    "numberInput('wb-in-sections-speed',150,",
+    "numberInput('wb-in-sections-speed',160,"
+  ]
+}

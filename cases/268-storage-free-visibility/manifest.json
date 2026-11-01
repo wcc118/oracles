@@ -1,0 +1,26 @@
+{
+  "id": "268-storage-free-visibility",
+  "task_class": "ui-state",
+  "runtime": "node-vm",
+  "strength": "invariant-or-residual",
+  "status": "probation",
+  "suite": "tuning",
+  "hashes": {
+    "input": "9240023cb35676fc4ed68b3c6c3aa6984e234d5ad478e0f3b6e1874b479a86e9",
+    "task": "e10408d6b2665bf04c47277e75a3dc551964007e1e882575ee9765ca9d2038da",
+    "check": "5d9c509c45ecc350fbdc8fb5ab972c087073521dc55cf80154eb2ef4549fe84d"
+  },
+  "origin": {
+    "issue": "wcc118/flight-loads#268",
+    "repo": "https://github.com/wcc118/flight-loads",
+    "raw_commit": "1ce74cd8bc9fbed0ede6011886d7d3c184d07926",
+    "fix_commit": "1eb614b01efc16f7698073288ffd309b8192d4a5",
+    "failure_class": "Legend hide/show state remains usable when browser storage is unavailable, and stays isolated per plot."
+  },
+  "registry_refs": [],
+  "memory_refs": [],
+  "notes": "State/data regression using a minimal DOM, not physical validation or a real-browser rendering claim. Shared fixture provenance: tests/fixtures/historical-source-index.json. Tuning only; not held out.",
+  "support_files": {
+    "lib/state_dom.mjs": "90ce06d3b15e2f9143ae5c0e6506f951bab73c83cfef282adf290f32ebce3349"
+  }
+}

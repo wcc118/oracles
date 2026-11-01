@@ -1,0 +1,26 @@
+{
+  "id": "266-pressure-drag",
+  "task_class": "ui-data",
+  "runtime": "node-vm",
+  "strength": "invariant-or-residual",
+  "status": "probation",
+  "suite": "tuning",
+  "hashes": {
+    "input": "fca82bfbf4c1c841f77d9673b1fe7cea6b54f968f4ac064736c5cfea44a29759",
+    "task": "750ab3f012f73debfb6d73494da2a157227a0b9b26f6b8b6b61c1f14ce81100f",
+    "check": "ab249d6752aa45c01579d8b9301e433e76be840e9dc6771c21c6a9219dc6035a"
+  },
+  "origin": {
+    "issue": "wcc118/flight-loads#266",
+    "repo": "https://github.com/wcc118/flight-loads",
+    "raw_commit": "f5e7798b7ca159e16b08559b98178b326558c0f5",
+    "fix_commit": "5333bc132605f663d9abe85e0873dd9ef4391b45",
+    "failure_class": "The drag polar must preserve both total drag and the independently supplied pressure-drag component."
+  },
+  "registry_refs": [],
+  "memory_refs": [],
+  "notes": "State/data regression using a minimal DOM, not physical validation or a real-browser rendering claim. Shared fixture provenance: tests/fixtures/historical-source-index.json. Tuning only; not held out.",
+  "support_files": {
+    "lib/state_dom.mjs": "90ce06d3b15e2f9143ae5c0e6506f951bab73c83cfef282adf290f32ebce3349"
+  }
+}

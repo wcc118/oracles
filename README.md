@@ -160,3 +160,27 @@ probation and handoff requirements. Private grading lessons use `oracle_memory`
 (port 9603); reusable public lessons use shared `memory` (port 9602). A reviewed
 public summary is authored separately, never copied automatically from private
 records. Versioned executable artifacts remain the reproducible evidence.
+
+## Historical flight-loads regression corpus
+
+Eight probationary tuning cases are available. The original root-reaction and
+playback-clock cases are joined by six state/data checks: read-only section
+rendering, helper/request separation, exact five-degree labels, pressure-drag
+series preservation, finite flight-angle ranges, and legend state when storage
+is denied. These are executable engineering-software regressions, not physical
+validation, browser rendering qualification, or a held-out model benchmark.
+
+The new cases reuse three raw/fix snapshot pairs under `tests/fixtures/265`,
+`266`, and `268` (about 560 KiB total). Full source commits and file hashes are in
+`tests/fixtures/historical-source-index.json`. Each check pins the shared DOM
+helper's hash. Its limited DOM makes detached IDs addressable and captures plot
+specifications; layout and actual SVG rendering are outside the checks' scope.
+
+Run `python3 tools/replay-historical.py` to regenerate distinct mutants and valid
+alternatives in temporary workspaces, execute the existing admission interface,
+and repeat every variant three times. `--write` retains reports with the checked
+revision, source/recipe/manifest/support hashes and Node version. Mutation recipes
+are data, not copied implementations. Missing files, runtime failures and support
+hash mismatches are inconclusive, never successful defect detections. New cases
+remain probationary; promotion requires a separate scoped decision and outcome
+qualification. Shared fixtures grow with retained distinct failures, not run count.

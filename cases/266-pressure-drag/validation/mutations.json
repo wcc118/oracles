@@ -1,0 +1,18 @@
+{
+  "mutants": [
+    [
+      "total-as-pressure",
+      "{name:'pressure CDp',x:Q.CL,y:Q.CDp,dash:true}",
+      "{name:'pressure CDp',x:Q.CL,y:Q.CD,dash:true}"
+    ],
+    [
+      "wrong-scale",
+      "{name:'pressure CDp',x:Q.CL,y:Q.CDp,dash:true}",
+      "{name:'pressure CDp',x:Q.CL,y:Q.CDp.map(v=>v*10),dash:true}"
+    ]
+  ],
+  "alternative": [
+    "name:'pressure CDp'",
+    "name:'Pressure drag component'"
+  ]
+}
