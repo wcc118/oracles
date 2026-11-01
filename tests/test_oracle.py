@@ -9,18 +9,27 @@ from pathlib import Path
 
 import pytest
 
-SCRIPT_DIR = Path(__file__).resolve().parent
-ROOT_DIR = SCRIPT_DIR.parent
-CASES_DIR = ROOT_DIR / "cases"
-SCHEMA_FILE = ROOT_DIR / "schema" / "case.schema.json"
-ORACLE_SCRIPT = ROOT_DIR / "tools" / "oracle"
-FIXTURES_DIR = ROOT_DIR / "tests" / "fixtures"
+# Original paths (preserved for reference)
+_SCRIPT_DIR = Path(__file__).resolve().parent
+ORIGINAL_ROOT_DIR = _SCRIPT_DIR.parent
+ORIGINAL_CASES_DIR = ORIGINAL_ROOT_DIR / "cases"
+SCHEMA_FILE = ORIGINAL_ROOT_DIR / "schema" / "case.schema.json"
+ORACLE_SCRIPT = ORIGINAL_ROOT_DIR / "tools" / "oracle"
+FIXTURES_DIR = ORIGINAL_ROOT_DIR / "tests" / "fixtures"
+
+# These will be patched by the fixture
+ROOT_DIR = ORIGINAL_ROOT_DIR
+CASES_DIR = ORIGINAL_CASES_DIR
 
 
 def run_oracle(*args, check=False):
-    """Run the oracle script and return result."""
+    """Run the oracle script and return result.
+
+    The oracle script is run from ROOT_DIR with the ORACLE_SCRIPT path.
+    The fixture _isolation_fixture sets these to use a temp copy of the repo.
+    """
     cmd = [sys.executable, str(ORACLE_SCRIPT)] + list(args)
-    result = subprocess.run(cmd, capture_output=True, text=True, timeout=60, cwd=ROOT_DIR)
+    result = subprocess.run(cmd, capture_output=True, text=True, timeout=60, cwd=str(ROOT_DIR))
     if check and result.returncode != 0:
         pytest.fail(f"Command failed: {cmd}\nstdout: {result.stdout}\nstderr: {result.stderr}")
     return result
@@ -35,13 +44,28 @@ def hash_file(path):
 
 
 def _tmp_repo(tmp_path):
-    """A throwaway copy of the tool layout, so fake cases never touch the real cases/ directory."""
+    """A throwaway copy of the tool layout, so fake cases never touch the real cases/ directory.
+
+    If the repo already exists (e.g., from autouse fixture), it will be reused.
+    """
     repo = tmp_path / "repo"
-    (repo / "tools").mkdir(parents=True)
-    shutil.copy2(ORACLE_SCRIPT, repo / "tools" / "oracle")
-    (repo / "schema").mkdir()
-    shutil.copy2(SCHEMA_FILE, repo / "schema" / "case.schema.json")
-    (repo / "cases").mkdir()
+    repo.mkdir(parents=True, exist_ok=True)
+
+    # Only copy if not already present
+    tools_dir = repo / "tools"
+    if not tools_dir.exists():
+        tools_dir.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(ORACLE_SCRIPT, tools_dir / "oracle")
+
+    schema_dir = repo / "schema"
+    if not schema_dir.exists():
+        schema_dir.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(SCHEMA_FILE, schema_dir / "case.schema.json")
+
+    cases_dir = repo / "cases"
+    if not cases_dir.exists():
+        cases_dir.mkdir(parents=True, exist_ok=True)
+
     return repo
 
 
@@ -125,6 +149,23 @@ def _workspace(tmp_path, name, passes):
 def _run_tmp(repo, *args):
     return subprocess.run([sys.executable, str(repo / "tools" / "oracle"), *args],
                           capture_output=True, text=True, timeout=60, cwd=repo)
+
+
+@pytest.fixture(autouse=True)
+def _isolation_fixture(tmp_path, monkeypatch):
+    """Run CLI checks against actual production files in a per-test layout."""
+    repo = tmp_path / ".oracle_repo"
+    for directory in ("tools", "schema", "cases", "tests/fixtures", "templates",
+                      "lib", "registry", "ledger"):
+        shutil.copytree(ORIGINAL_ROOT_DIR / directory, repo / directory)
+    for name, path in {
+        "ROOT_DIR": repo,
+        "CASES_DIR": repo / "cases",
+        "SCHEMA_FILE": repo / "schema/case.schema.json",
+        "ORACLE_SCRIPT": repo / "tools/oracle",
+        "FIXTURES_DIR": repo / "tests/fixtures",
+    }.items():
+        monkeypatch.setitem(globals(), name, path)
 
 
 class TestManifestLoading:
