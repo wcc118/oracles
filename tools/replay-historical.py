@@ -3,6 +3,7 @@
 import argparse
 import hashlib
 import json
+import platform
 from pathlib import Path
 import shutil
 import subprocess
@@ -15,12 +16,17 @@ def digest(path):
     return hashlib.sha256(path.read_bytes()).hexdigest()
 
 
+def require(condition, evidence):
+    if not condition:
+        raise RuntimeError(str(evidence))
+
+
 def replay(write=False):
     index_path = ROOT / 'tests/fixtures/historical-source-index.json'
     index = json.loads(index_path.read_text())
     for issue, variants in index.items():
         for variant, source in variants.items():
-            assert digest(ROOT / 'tests/fixtures' / issue / variant / source['file']) == source['sha256']
+            require(digest(ROOT / 'tests/fixtures' / issue / variant / source['file']) == source['sha256'], (issue, variant, 'source hash mismatch'))
     recipes = sorted((ROOT / 'cases').glob('*/validation/mutations.json'))
     for recipe_path in recipes:
         case = recipe_path.parent.parent
@@ -33,7 +39,7 @@ def replay(write=False):
                 shutil.copytree(fixture / 'fix', target)
                 source = target / index[case.name[:3]]['fix']['file']
                 text = source.read_text()
-                assert text.count(old) == 1, (case.name, name, 'mutation target changed')
+                require(text.count(old) == 1, (case.name, name, 'mutation target changed'))
                 source.write_text(text.replace(old, new))
                 workspaces[name] = target
             command = [str(ROOT / 'tools/oracle'), 'validate', case.name,
@@ -41,20 +47,21 @@ def replay(write=False):
             for name, _, _ in recipe['mutants']:
                 command += ['--mutant', name + '=' + str(workspaces[name])]
             admission = subprocess.run(command, capture_output=True, text=True, timeout=30)
-            assert admission.returncode == 0, admission.stdout + admission.stderr
+            require(admission.returncode == 0, admission.stdout + admission.stderr)
             for name, workspace in workspaces.items():
                 expected = 0 if name in {'fix', 'alternative'} else 1
                 for _ in range(3):
                     result = subprocess.run(['node', str(case / 'oracle/check.mjs'), str(workspace)],
                                             capture_output=True, text=True, timeout=10)
-                    assert result.returncode == expected, (case.name, name, result.stdout, result.stderr)
-                    assert json.loads(result.stdout).get('ok') is (expected == 0)
+                    require(result.returncode == expected, (case.name, name, result.stdout, result.stderr))
+                    require(json.loads(result.stdout).get('ok') is (expected == 0), (case.name, name, 'wrong verdict'))
             if write:
                 result = subprocess.run([*command, '--write'], capture_output=True, text=True, timeout=30)
-                assert result.returncode == 0, result.stdout + result.stderr
+                require(result.returncode == 0, result.stdout + result.stderr)
                 report_path = case / 'validation/report.json'
                 report = json.loads(report_path.read_text())
                 report['replay_evidence'] = {
+                    'python_version': platform.python_version(),
                     'repetitions_per_variant': 3, 'valid_alternative_passed': True,
                     'source_index_sha256': digest(index_path), 'recipe_sha256': digest(recipe_path),
                     'manifest_sha256': digest(case / 'manifest.json'),
