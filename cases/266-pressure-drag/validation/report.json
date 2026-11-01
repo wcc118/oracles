@@ -1,0 +1,62 @@
+{
+  "timestamp": "2026-11-01T07:04:35Z",
+  "commit": "6cef37bd9d8a34d077eb434d83004aa63dfd07d5",
+  "results": {
+    "raw": {
+      "ok": false,
+      "reason": "preserve each supplied drag component",
+      "process_exit_code": 1,
+      "stdout": "{\"ok\":false,\"reason\":\"preserve each supplied drag component\"}",
+      "stderr": "",
+      "exit_code": 1,
+      "protocol_valid": true,
+      "outcome": "fail"
+    },
+    "fix": {
+      "ok": true,
+      "reason": "Behavioral assertions passed",
+      "process_exit_code": 0,
+      "stdout": "{\"ok\":true,\"reason\":\"Behavioral assertions passed\"}",
+      "stderr": "",
+      "exit_code": 0,
+      "protocol_valid": true,
+      "outcome": "pass"
+    },
+    "total-as-pressure": {
+      "ok": false,
+      "reason": "preserve each supplied drag component",
+      "process_exit_code": 1,
+      "stdout": "{\"ok\":false,\"reason\":\"preserve each supplied drag component\"}",
+      "stderr": "",
+      "exit_code": 1,
+      "protocol_valid": true,
+      "outcome": "fail"
+    },
+    "wrong-scale": {
+      "ok": false,
+      "reason": "preserve each supplied drag component",
+      "process_exit_code": 1,
+      "stdout": "{\"ok\":false,\"reason\":\"preserve each supplied drag component\"}",
+      "stderr": "",
+      "exit_code": 1,
+      "protocol_valid": true,
+      "outcome": "fail"
+    }
+  },
+  "verdict": true,
+  "mutant_failures": {
+    "behavioral": 2,
+    "structural": 0
+  },
+  "replay_evidence": {
+    "python_version": "3.12.3",
+    "repetitions_per_variant": 3,
+    "valid_alternative_passed": true,
+    "source_index_sha256": "794b6c07a7f60e73f42fc2f9e67cd23f5add1bc00214fde121ca72d723115731",
+    "recipe_sha256": "fde91ccd81734486c8c1c5e51c7c07c497f171281eaf6f199929eb5ee7851853",
+    "manifest_sha256": "6175ba6fc60d00f409c72c26fd46b73f710c8623c9c3a8e42bfb7d7c77cf9fcc",
+    "support_sha256": "90ce06d3b15e2f9143ae5c0e6506f951bab73c83cfef282adf290f32ebce3349",
+    "node_version": "v22.22.2",
+    "scope": "State/data regression; tuning only; no browser or physical-validation claim"
+  }
+}

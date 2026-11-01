@@ -1,0 +1,62 @@
+{
+  "timestamp": "2026-11-01T07:04:33Z",
+  "commit": "6cef37bd9d8a34d077eb434d83004aa63dfd07d5",
+  "results": {
+    "raw": {
+      "ok": false,
+      "reason": "ignore absent and nonfinite angles\n+ actual - expected\n\n  {\n+   max: null,\n+   min: null\n-   max: 3,\n-   min: -2\n  }\n",
+      "process_exit_code": 1,
+      "stdout": "{\"ok\":false,\"reason\":\"ignore absent and nonfinite angles\\n+ actual - expected\\n\\n  {\\n+   max: null,\\n+   min: null\\n-   max: 3,\\n-   min: -2\\n  }\\n\"}",
+      "stderr": "",
+      "exit_code": 1,
+      "protocol_valid": true,
+      "outcome": "fail"
+    },
+    "fix": {
+      "ok": true,
+      "reason": "Behavioral assertions passed",
+      "process_exit_code": 0,
+      "stdout": "{\"ok\":true,\"reason\":\"Behavioral assertions passed\"}",
+      "stderr": "",
+      "exit_code": 0,
+      "protocol_valid": true,
+      "outcome": "pass"
+    },
+    "infinite-observations": {
+      "ok": false,
+      "reason": "ignore absent and nonfinite angles\n+ actual - expected\n\n  {\n+   max: null,\n+   min: null\n-   max: 3,\n-   min: -2\n  }\n",
+      "process_exit_code": 1,
+      "stdout": "{\"ok\":false,\"reason\":\"ignore absent and nonfinite angles\\n+ actual - expected\\n\\n  {\\n+   max: null,\\n+   min: null\\n-   max: 3,\\n-   min: -2\\n  }\\n\"}",
+      "stderr": "",
+      "exit_code": 1,
+      "protocol_valid": true,
+      "outcome": "fail"
+    },
+    "swapped-extrema": {
+      "ok": false,
+      "reason": "ignore absent and nonfinite angles\n+ actual - expected\n\n  {\n+   max: -2,\n+   min: 3\n-   max: 3,\n-   min: -2\n  }\n",
+      "process_exit_code": 1,
+      "stdout": "{\"ok\":false,\"reason\":\"ignore absent and nonfinite angles\\n+ actual - expected\\n\\n  {\\n+   max: -2,\\n+   min: 3\\n-   max: 3,\\n-   min: -2\\n  }\\n\"}",
+      "stderr": "",
+      "exit_code": 1,
+      "protocol_valid": true,
+      "outcome": "fail"
+    }
+  },
+  "verdict": true,
+  "mutant_failures": {
+    "behavioral": 2,
+    "structural": 0
+  },
+  "replay_evidence": {
+    "python_version": "3.12.3",
+    "repetitions_per_variant": 3,
+    "valid_alternative_passed": true,
+    "source_index_sha256": "794b6c07a7f60e73f42fc2f9e67cd23f5add1bc00214fde121ca72d723115731",
+    "recipe_sha256": "b6ea765ab363cdae07a296bf2c94542dc54944df48dd390f3ffe19c1f082c850",
+    "manifest_sha256": "ce39af701c52567bb1f1ad721e6ccc85a1895de7c6e7530256dee6feb9d2c944",
+    "support_sha256": "90ce06d3b15e2f9143ae5c0e6506f951bab73c83cfef282adf290f32ebce3349",
+    "node_version": "v22.22.2",
+    "scope": "State/data regression; tuning only; no browser or physical-validation claim"
+  }
+}

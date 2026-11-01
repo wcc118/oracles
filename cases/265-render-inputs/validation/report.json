@@ -1,0 +1,62 @@
+{
+  "timestamp": "2026-11-01T07:04:32Z",
+  "commit": "6cef37bd9d8a34d077eb434d83004aa63dfd07d5",
+  "results": {
+    "raw": {
+      "ok": false,
+      "reason": "render must preserve every input\n+ actual - expected\n\n  {\n    airfoil: 'NACA 0012',\n+   airspeed: 150,\n    flap: {\n      enabled: false\n    },\n+   mach: 0.13435442697836894,\n+   reynolds: 318005.4696940787\n-   mach: 0.12,\n-   reynolds: 234567\n  }\n",
+      "process_exit_code": 1,
+      "stdout": "{\"ok\":false,\"reason\":\"render must preserve every input\\n+ actual - expected\\n\\n  {\\n    airfoil: 'NACA 0012',\\n+   airspeed: 150,\\n    flap: {\\n      enabled: false\\n    },\\n+   mach: 0.13435442697836894,\\n+   reynolds: 318005.4696940787\\n-   mach: 0.12,\\n-   reynolds: 234567\\n  }\\n\"}",
+      "stderr": "",
+      "exit_code": 1,
+      "protocol_valid": true,
+      "outcome": "fail"
+    },
+    "fix": {
+      "ok": true,
+      "reason": "Behavioral assertions passed",
+      "process_exit_code": 0,
+      "stdout": "{\"ok\":true,\"reason\":\"Behavioral assertions passed\"}",
+      "stderr": "",
+      "exit_code": 0,
+      "protocol_valid": true,
+      "outcome": "pass"
+    },
+    "mach-reset": {
+      "ok": false,
+      "reason": "render must preserve every input\n+ actual - expected\n\n  {\n    airfoil: 'NACA 0012',\n    flap: {\n      enabled: false\n    },\n+   mach: 0,\n-   mach: 0.12,\n    reynolds: 234567\n  }\n",
+      "process_exit_code": 1,
+      "stdout": "{\"ok\":false,\"reason\":\"render must preserve every input\\n+ actual - expected\\n\\n  {\\n    airfoil: 'NACA 0012',\\n    flap: {\\n      enabled: false\\n    },\\n+   mach: 0,\\n-   mach: 0.12,\\n    reynolds: 234567\\n  }\\n\"}",
+      "stderr": "",
+      "exit_code": 1,
+      "protocol_valid": true,
+      "outcome": "fail"
+    },
+    "re-scaled": {
+      "ok": false,
+      "reason": "render must preserve every input\n+ actual - expected\n\n  {\n    airfoil: 'NACA 0012',\n    flap: {\n      enabled: false\n    },\n    mach: 0.12,\n+   reynolds: 469134\n-   reynolds: 234567\n  }\n",
+      "process_exit_code": 1,
+      "stdout": "{\"ok\":false,\"reason\":\"render must preserve every input\\n+ actual - expected\\n\\n  {\\n    airfoil: 'NACA 0012',\\n    flap: {\\n      enabled: false\\n    },\\n    mach: 0.12,\\n+   reynolds: 469134\\n-   reynolds: 234567\\n  }\\n\"}",
+      "stderr": "",
+      "exit_code": 1,
+      "protocol_valid": true,
+      "outcome": "fail"
+    }
+  },
+  "verdict": true,
+  "mutant_failures": {
+    "behavioral": 2,
+    "structural": 0
+  },
+  "replay_evidence": {
+    "python_version": "3.12.3",
+    "repetitions_per_variant": 3,
+    "valid_alternative_passed": true,
+    "source_index_sha256": "794b6c07a7f60e73f42fc2f9e67cd23f5add1bc00214fde121ca72d723115731",
+    "recipe_sha256": "5bc7b1cc8117d5bc00495e572fc8e9946ddd65a2a1ddc66577432dfd85662430",
+    "manifest_sha256": "6fe8bbd3483f043a9ec83ee4500ff174fa2e07697ded7bbdc797a8a9d3faf488",
+    "support_sha256": "90ce06d3b15e2f9143ae5c0e6506f951bab73c83cfef282adf290f32ebce3349",
+    "node_version": "v22.22.2",
+    "scope": "State/data regression; tuning only; no browser or physical-validation claim"
+  }
+}
