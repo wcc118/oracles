@@ -1,9 +1,10 @@
 # oracles
 
 Executable checks that grade work produced by local coder/sub-agent runs, plus the
-agent-maintained library that grows them. Private. Owned by the oracle steward
-(see AGENTS.md). Hidden from workers: nothing here is ever mounted into a worker
-workspace.
+frontier-managed library that grows them (see AGENTS.md). Public development
+checks and genuinely held-out evaluation material have different access needs.
+Oracle-maintenance workers may receive bounded source; evaluated project workers
+must not receive held-out answers through files, git history or memory.
 
 Layout: `cases/<id>/` (manifest, task, input, oracle, validation), `invariants/`
 (shared parameterized physics checks), `registry/` (validated reference results),
@@ -88,7 +89,7 @@ python3 tools/oracle ledger --repeats
 
 ## Node-VM Check Lint Rules
 
-The `validate` command enforces linting rules on node-vm checks to ensure they actually execute workspace code rather than just text-matching.
+The `validate` command applies heuristic lint rules to node-vm checks. These flag common text-matching mistakes but cannot prove the relevant workspace behavior was executed.
 
 ### Structural vs Behavioral Execution
 
@@ -121,7 +122,7 @@ The lint rule checks for text-matching by analyzing the check source:
 
 When validating with `--write`, the report includes:
 - **structural failures**: exit code 2, or reasons containing "not found" or "unexpected structure"
-- **behavioral failures**: all other failures where `exit_code == 1`
+- **behavioral failures**: protocol-valid exit-1 results without explicit errors or a structural-failure diagnostic; see the result contract below
 
 The `>=2 mutants must fail` requirement counts only **behavioral** failures.
 
@@ -150,3 +151,12 @@ behavior. Structural-message classification is also diagnostic. Independent
 review, meaningful behavioral mutations and valid alternative implementations
 remain necessary. Historical admission reports describe their original tool
 revision and are not silently promoted by a runner update.
+
+## Learning and memory
+
+The frontier orchestrator owns capture, evaluation and promotion during ordinary
+project work. See [the charter](AGENTS.md) for the routine, independent review,
+probation and handoff requirements. Private grading lessons use `oracle_memory`
+(port 9603); reusable public lessons use shared `memory` (port 9602). A reviewed
+public summary is authored separately, never copied automatically from private
+records. Versioned executable artifacts remain the reproducible evidence.
