@@ -1,0 +1,62 @@
+{
+  "timestamp": "2026-11-01T07:04:34Z",
+  "commit": "6cef37bd9d8a34d077eb434d83004aa63dfd07d5",
+  "results": {
+    "raw": {
+      "ok": false,
+      "reason": "one label per selected angle\n\n9 !== 5\n",
+      "process_exit_code": 1,
+      "stdout": "{\"ok\":false,\"reason\":\"one label per selected angle\\n\\n9 !== 5\\n\"}",
+      "stderr": "",
+      "exit_code": 1,
+      "protocol_valid": true,
+      "outcome": "fail"
+    },
+    "fix": {
+      "ok": true,
+      "reason": "Behavioral assertions passed",
+      "process_exit_code": 0,
+      "stdout": "{\"ok\":true,\"reason\":\"Behavioral assertions passed\"}",
+      "stderr": "",
+      "exit_code": 0,
+      "protocol_valid": true,
+      "outcome": "pass"
+    },
+    "ten-degree": {
+      "ok": false,
+      "reason": "one label per selected angle\n\n3 !== 5\n",
+      "process_exit_code": 1,
+      "stdout": "{\"ok\":false,\"reason\":\"one label per selected angle\\n\\n3 !== 5\\n\"}",
+      "stderr": "",
+      "exit_code": 1,
+      "protocol_valid": true,
+      "outcome": "fail"
+    },
+    "inverted-selection": {
+      "ok": false,
+      "reason": "one label per selected angle\n\n4 !== 5\n",
+      "process_exit_code": 1,
+      "stdout": "{\"ok\":false,\"reason\":\"one label per selected angle\\n\\n4 !== 5\\n\"}",
+      "stderr": "",
+      "exit_code": 1,
+      "protocol_valid": true,
+      "outcome": "fail"
+    }
+  },
+  "verdict": true,
+  "mutant_failures": {
+    "behavioral": 2,
+    "structural": 0
+  },
+  "replay_evidence": {
+    "python_version": "3.12.3",
+    "repetitions_per_variant": 3,
+    "valid_alternative_passed": true,
+    "source_index_sha256": "794b6c07a7f60e73f42fc2f9e67cd23f5add1bc00214fde121ca72d723115731",
+    "recipe_sha256": "032a2e6a066d777c5363934d80f5468675523df30459fec31b91955b2d8b5192",
+    "manifest_sha256": "95c60d10f715f398f2bfc213f2cd602df1b96f2df829991587a49067b02013ee",
+    "support_sha256": "90ce06d3b15e2f9143ae5c0e6506f951bab73c83cfef282adf290f32ebce3349",
+    "node_version": "v22.22.2",
+    "scope": "State/data regression; tuning only; no browser or physical-validation claim"
+  }
+}

@@ -1,0 +1,18 @@
+{
+  "mutants": [
+    [
+      "infinite-observations",
+      "a!=null&&isFinite(a)",
+      "a!=null"
+    ],
+    [
+      "swapped-extrema",
+      "{min:Math.min(...alphas),max:Math.max(...alphas)}",
+      "{min:Math.max(...alphas),max:Math.min(...alphas)}"
+    ]
+  ],
+  "alternative": [
+    "a!=null&&isFinite(a)",
+    "Number.isFinite(a)"
+  ]
+}

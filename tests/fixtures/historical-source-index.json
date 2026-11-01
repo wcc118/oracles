@@ -1,0 +1,38 @@
+{
+  "265": {
+    "raw": {
+      "commit": "6fbf7b001f21e463fea960102003ef7bb97d5277",
+      "file": "src/flightloads/static/workbench.js",
+      "sha256": "7d3cbb65108e36be21ecbcf7e56339be816e142febcfa20602621d95b373fa06"
+    },
+    "fix": {
+      "commit": "c7d7cbb9e97bf9a841b5dea669978373549f889f",
+      "file": "src/flightloads/static/workbench.js",
+      "sha256": "d4a649ca15c826bf2b64874ee0ec1c5787c48c1726fcf6138605beec7959477a"
+    }
+  },
+  "266": {
+    "raw": {
+      "commit": "f5e7798b7ca159e16b08559b98178b326558c0f5",
+      "file": "src/flightloads/static/workbench.js",
+      "sha256": "fca82bfbf4c1c841f77d9673b1fe7cea6b54f968f4ac064736c5cfea44a29759"
+    },
+    "fix": {
+      "commit": "5333bc132605f663d9abe85e0873dd9ef4391b45",
+      "file": "src/flightloads/static/workbench.js",
+      "sha256": "6238170c8bae5f0b6aedf618065c0b497eae52844235c4f5ea4323f97bdd110f"
+    }
+  },
+  "268": {
+    "raw": {
+      "commit": "1ce74cd8bc9fbed0ede6011886d7d3c184d07926",
+      "file": "src/flightloads/static/workbench-plot.js",
+      "sha256": "9240023cb35676fc4ed68b3c6c3aa6984e234d5ad478e0f3b6e1874b479a86e9"
+    },
+    "fix": {
+      "commit": "1eb614b01efc16f7698073288ffd309b8192d4a5",
+      "file": "src/flightloads/static/workbench-plot.js",
+      "sha256": "5bf38e1d0bde186d862be0811cb07dcc2c7400d9f983f4271d9ce0b62644459a"
+    }
+  }
+}

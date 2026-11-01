@@ -1,0 +1,18 @@
+{
+  "mutants": [
+    [
+      "mach-reset",
+      "function sectionsView(){",
+      "function sectionsView(){wb.inputs.sections.mach=0;"
+    ],
+    [
+      "re-scaled",
+      "function sectionsView(){",
+      "function sectionsView(){wb.inputs.sections.reynolds*=2;"
+    ]
+  ],
+  "alternative": [
+    "numberInput('wb-in-sections-speed',150,",
+    "numberInput('wb-in-sections-speed',160,"
+  ]
+}

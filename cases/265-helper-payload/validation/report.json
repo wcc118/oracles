@@ -1,0 +1,62 @@
+{
+  "timestamp": "2026-11-01T07:04:31Z",
+  "commit": "6cef37bd9d8a34d077eb434d83004aa63dfd07d5",
+  "results": {
+    "raw": {
+      "ok": false,
+      "reason": "helper controls must not extend API payload\n+ actual - expected\n\n  [\n    'airfoil',\n+   'airspeed',\n    'flap',\n    'mach',\n    'reynolds',\n+   'surface'\n  ]\n",
+      "process_exit_code": 1,
+      "stdout": "{\"ok\":false,\"reason\":\"helper controls must not extend API payload\\n+ actual - expected\\n\\n  [\\n    'airfoil',\\n+   'airspeed',\\n    'flap',\\n    'mach',\\n    'reynolds',\\n+   'surface'\\n  ]\\n\"}",
+      "stderr": "",
+      "exit_code": 1,
+      "protocol_valid": true,
+      "outcome": "fail"
+    },
+    "fix": {
+      "ok": true,
+      "reason": "Behavioral assertions passed",
+      "process_exit_code": 0,
+      "stdout": "{\"ok\":true,\"reason\":\"Behavioral assertions passed\"}",
+      "stderr": "",
+      "exit_code": 0,
+      "protocol_valid": true,
+      "outcome": "pass"
+    },
+    "speed-field": {
+      "ok": false,
+      "reason": "helper controls must not extend API payload\n+ actual - expected\n\n  [\n    'airfoil',\n+   'airspeed',\n    'flap',\n    'mach',\n    'reynolds'\n  ]\n",
+      "process_exit_code": 1,
+      "stdout": "{\"ok\":false,\"reason\":\"helper controls must not extend API payload\\n+ actual - expected\\n\\n  [\\n    'airfoil',\\n+   'airspeed',\\n    'flap',\\n    'mach',\\n    'reynolds'\\n  ]\\n\"}",
+      "stderr": "",
+      "exit_code": 1,
+      "protocol_valid": true,
+      "outcome": "fail"
+    },
+    "surface-field": {
+      "ok": false,
+      "reason": "helper controls must not extend API payload\n+ actual - expected\n\n  [\n    'airfoil',\n    'flap',\n    'mach',\n    'reynolds',\n+   'surface'\n  ]\n",
+      "process_exit_code": 1,
+      "stdout": "{\"ok\":false,\"reason\":\"helper controls must not extend API payload\\n+ actual - expected\\n\\n  [\\n    'airfoil',\\n    'flap',\\n    'mach',\\n    'reynolds',\\n+   'surface'\\n  ]\\n\"}",
+      "stderr": "",
+      "exit_code": 1,
+      "protocol_valid": true,
+      "outcome": "fail"
+    }
+  },
+  "verdict": true,
+  "mutant_failures": {
+    "behavioral": 2,
+    "structural": 0
+  },
+  "replay_evidence": {
+    "python_version": "3.12.3",
+    "repetitions_per_variant": 3,
+    "valid_alternative_passed": true,
+    "source_index_sha256": "794b6c07a7f60e73f42fc2f9e67cd23f5add1bc00214fde121ca72d723115731",
+    "recipe_sha256": "5fd6e716bd9e8fb9d3d03e739d56a5c06b6f75c5833dda55545f46f9368e1964",
+    "manifest_sha256": "212214cfd2e00ee6a5de5302a72c3a41cbecba585b33ae550151de6883e1cda8",
+    "support_sha256": "90ce06d3b15e2f9143ae5c0e6506f951bab73c83cfef282adf290f32ebce3349",
+    "node_version": "v22.22.2",
+    "scope": "State/data regression; tuning only; no browser or physical-validation claim"
+  }
+}

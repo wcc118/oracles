@@ -1,0 +1,18 @@
+{
+  "mutants": [
+    [
+      "forget-hidden",
+      "PLOT_HIDDEN.set(id,set);",
+      "PLOT_HIDDEN.set(id,new Set());"
+    ],
+    [
+      "show-stays-hidden",
+      "if(hidden)set.add(name);else set.delete(name);",
+      "if(hidden)set.add(name);else set.add(name);"
+    ]
+  ],
+  "alternative": [
+    "if(hidden)set.add(name);else set.delete(name);",
+    "hidden?set.add(name):set.delete(name);"
+  ]
+}

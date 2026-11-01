@@ -1,0 +1,26 @@
+{
+  "id": "265-helper-payload",
+  "task_class": "ui-state",
+  "runtime": "node-vm",
+  "strength": "invariant-or-residual",
+  "status": "probation",
+  "suite": "tuning",
+  "hashes": {
+    "input": "7d3cbb65108e36be21ecbcf7e56339be816e142febcfa20602621d95b373fa06",
+    "task": "1c2378a883dfd40a78fc3cc3a51038ae223dc930851ea64f9ac4d4bee958088a",
+    "check": "1f0c16fbbdeead50943bba23d8211a4cd6f01b1ea74cdb5316c5bde1ee2c74bf"
+  },
+  "origin": {
+    "issue": "wcc118/flight-loads#265",
+    "repo": "https://github.com/wcc118/flight-loads",
+    "raw_commit": "6fbf7b001f21e463fea960102003ef7bb97d5277",
+    "fix_commit": "c7d7cbb9e97bf9a841b5dea669978373549f889f",
+    "failure_class": "Editing helper speed/surface controls must not add UI-only fields to the section request."
+  },
+  "registry_refs": [],
+  "memory_refs": [],
+  "notes": "State/data regression using a minimal DOM, not physical validation or a real-browser rendering claim. Shared fixture provenance: tests/fixtures/historical-source-index.json. Tuning only; not held out.",
+  "support_files": {
+    "lib/state_dom.mjs": "90ce06d3b15e2f9143ae5c0e6506f951bab73c83cfef282adf290f32ebce3349"
+  }
+}

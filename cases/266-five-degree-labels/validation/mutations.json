@@ -1,0 +1,18 @@
+{
+  "mutants": [
+    [
+      "ten-degree",
+      "Math.abs(a/5-Math.round(a/5))>1e-9",
+      "Math.abs(a/10-Math.round(a/10))>1e-9"
+    ],
+    [
+      "inverted-selection",
+      "Math.abs(a/5-Math.round(a/5))>1e-9",
+      "Math.abs(a/5-Math.round(a/5))<1e-9"
+    ]
+  ],
+  "alternative": [
+    "Math.abs(a/5-Math.round(a/5))>1e-9",
+    "Math.abs(a/5-Math.round(a/5))*5>5e-9"
+  ]
+}
