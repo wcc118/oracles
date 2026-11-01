@@ -69,38 +69,6 @@ def _tmp_repo(tmp_path):
     return repo
 
 
-def _full_repo_copy(tmp_path):
-    """Copy entire repo layout to tmp_path, patching globals for isolation."""
-    repo = tmp_path / "repo"
-    repo.mkdir(parents=True)
-
-    # Copy tools
-    shutil.copytree(ORIGINAL_ROOT_DIR / "tools", repo / "tools", dirs_exist_ok=True)
-
-    # Copy schema
-    shutil.copytree(ORIGINAL_ROOT_DIR / "schema", repo / "schema", dirs_exist_ok=True)
-
-    # Copy cases (empty at start)
-    (repo / "cases").mkdir(parents=True)
-
-    # Copy fixtures
-    shutil.copytree(ORIGINAL_ROOT_DIR / "tests" / "fixtures", repo / "tests" / "fixtures", dirs_exist_ok=True)
-
-    # Copy templates
-    shutil.copytree(ORIGINAL_ROOT_DIR / "templates", repo / "templates", dirs_exist_ok=True)
-
-    # Copy lib
-    shutil.copytree(ORIGINAL_ROOT_DIR / "lib", repo / "lib", dirs_exist_ok=True)
-
-    # Copy registry (empty at start)
-    (repo / "registry").mkdir(parents=True)
-
-    # Copy ledger (empty at start)
-    (repo / "ledger").mkdir(parents=True)
-
-    return repo
-
-
 def load_oracle_module(repo_root):
     """Load the oracle module from tools/oracle using SourceFileLoader.
 
@@ -183,67 +151,21 @@ def _run_tmp(repo, *args):
                           capture_output=True, text=True, timeout=60, cwd=repo)
 
 
-# Autouse fixture for test isolation
 @pytest.fixture(autouse=True)
-def _isolation_fixture(request, tmp_path):
-    """Isolate tests by copying production directories to tmp_path.
-
-    This prevents tests from modifying the actual cases/, fixtures/, etc.
-    directories and ensures each test gets a fresh copy.
-    """
-    # Only apply isolation to tests in this module
-    if "test_oracle" not in str(request.path):
-        yield
-        return
-
-    # Create a full copy of the repo layout in a hidden directory
-    # to avoid conflicts with tests that create their own repo/
+def _isolation_fixture(tmp_path, monkeypatch):
+    """Run CLI checks against actual production files in a per-test layout."""
     repo = tmp_path / ".oracle_repo"
-    repo.mkdir(parents=True, exist_ok=True)
-
-    # Copy tools
-    shutil.copytree(ORIGINAL_ROOT_DIR / "tools", repo / "tools", dirs_exist_ok=True)
-
-    # Copy schema
-    shutil.copytree(ORIGINAL_ROOT_DIR / "schema", repo / "schema", dirs_exist_ok=True)
-
-    # Copy cases (including original cases for tests to use)
-    shutil.copytree(ORIGINAL_ROOT_DIR / "cases", repo / "cases", dirs_exist_ok=True)
-
-    # Copy fixtures
-    shutil.copytree(ORIGINAL_ROOT_DIR / "tests" / "fixtures", repo / "tests" / "fixtures", dirs_exist_ok=True)
-
-    # Copy templates
-    shutil.copytree(ORIGINAL_ROOT_DIR / "templates", repo / "templates", dirs_exist_ok=True)
-
-    # Copy lib
-    shutil.copytree(ORIGINAL_ROOT_DIR / "lib", repo / "lib", dirs_exist_ok=True)
-
-    # Copy registry (empty at start)
-    shutil.copytree(ORIGINAL_ROOT_DIR / "registry", repo / "registry", dirs_exist_ok=True)
-
-    # Copy ledger (empty at start)
-    shutil.copytree(ORIGINAL_ROOT_DIR / "ledger", repo / "ledger", dirs_exist_ok=True)
-
-    # Patch module globals for tests that use run_oracle (subprocess)
-    old_globals = {}
-    for name in ["ROOT_DIR", "CASES_DIR", "SCHEMA_FILE", "ORACLE_SCRIPT", "FIXTURES_DIR"]:
-        old_globals[name] = globals()[name]
-
-    # Patch globals to use temp repo
-    global ROOT_DIR, CASES_DIR, SCHEMA_FILE, ORACLE_SCRIPT, FIXTURES_DIR
-    ROOT_DIR = repo
-    CASES_DIR = repo / "cases"
-    SCHEMA_FILE = repo / "schema" / "case.schema.json"
-    ORACLE_SCRIPT = repo / "tools" / "oracle"
-    FIXTURES_DIR = repo / "tests" / "fixtures"
-
-    try:
-        yield
-    finally:
-        # Restore globals
-        for name, value in old_globals.items():
-            globals()[name] = value
+    for directory in ("tools", "schema", "cases", "tests/fixtures", "templates",
+                      "lib", "registry", "ledger"):
+        shutil.copytree(ORIGINAL_ROOT_DIR / directory, repo / directory)
+    for name, path in {
+        "ROOT_DIR": repo,
+        "CASES_DIR": repo / "cases",
+        "SCHEMA_FILE": repo / "schema/case.schema.json",
+        "ORACLE_SCRIPT": repo / "tools/oracle",
+        "FIXTURES_DIR": repo / "tests/fixtures",
+    }.items():
+        monkeypatch.setitem(globals(), name, path)
 
 
 class TestManifestLoading:
