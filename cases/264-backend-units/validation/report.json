@@ -1,0 +1,604 @@
+{
+  "timestamp": "2026-11-01T07:43:58Z",
+  "commit": "003730fe632b7eb9895d552356f1d4154a3b55c6",
+  "results": {
+    "raw": {
+      "ok": false,
+      "checks": [
+        {
+          "name": "weight",
+          "ok": false,
+          "actual": {
+            "id": "known-part",
+            "kind": "part",
+            "reference_B_in": [
+              0.0,
+              0.0,
+              0.0
+            ],
+            "force_B_lbf": [
+              -0.0,
+              -0.0,
+              -1.0
+            ],
+            "moment_B_in_lbf": [
+              -0.0,
+              -0.0,
+              -0.0
+            ]
+          },
+          "expected_force_B_lbf": [
+            0.0,
+            0.0,
+            -12.0
+          ],
+          "expected_moment_B_in_lbf": [
+            0.0,
+            0.0,
+            0.0
+          ]
+        },
+        {
+          "name": "acceleration",
+          "ok": false,
+          "actual": {
+            "id": "known-part",
+            "kind": "part",
+            "reference_B_in": [
+              0.0,
+              0.0,
+              0.0
+            ],
+            "force_B_lbf": [
+              -0.0,
+              -0.0,
+              1.0
+            ],
+            "moment_B_in_lbf": [
+              -0.0,
+              -0.0,
+              -0.0
+            ]
+          },
+          "expected_force_B_lbf": [
+            0.0,
+            0.0,
+            12.0
+          ],
+          "expected_moment_B_in_lbf": [
+            0.0,
+            0.0,
+            0.0
+          ]
+        },
+        {
+          "name": "inertia-couple",
+          "ok": false,
+          "actual": {
+            "id": "known-part",
+            "kind": "part",
+            "reference_B_in": [
+              0.0,
+              0.0,
+              0.0
+            ],
+            "force_B_lbf": [
+              -0.0,
+              -0.0,
+              -1.0
+            ],
+            "moment_B_in_lbf": [
+              0.041666666666666664,
+              -0.0,
+              -0.0
+            ]
+          },
+          "expected_force_B_lbf": [
+            0.0,
+            0.0,
+            -12.0
+          ],
+          "expected_moment_B_in_lbf": [
+            6.0,
+            0.0,
+            0.0
+          ]
+        }
+      ],
+      "process_exit_code": 1,
+      "stdout": "{\"ok\": false, \"checks\": [{\"name\": \"weight\", \"ok\": false, \"actual\": {\"id\": \"known-part\", \"kind\": \"part\", \"reference_B_in\": [0.0, 0.0, 0.0], \"force_B_lbf\": [-0.0, -0.0, -1.0], \"moment_B_in_lbf\": [-0.0, -0.0, -0.0]}, \"expected_force_B_lbf\": [0.0, 0.0, -12.0], \"expected_moment_B_in_lbf\": [0.0, 0.0, 0.0]}, {\"name\": \"acceleration\", \"ok\": false, \"actual\": {\"id\": \"known-part\", \"kind\": \"part\", \"reference_B_in\": [0.0, 0.0, 0.0], \"force_B_lbf\": [-0.0, -0.0, 1.0], \"moment_B_in_lbf\": [-0.0, -0.0, -0.0]}, \"expected_force_B_lbf\": [0.0, 0.0, 12.0], \"expected_moment_B_in_lbf\": [0.0, 0.0, 0.0]}, {\"name\": \"inertia-couple\", \"ok\": false, \"actual\": {\"id\": \"known-part\", \"kind\": \"part\", \"reference_B_in\": [0.0, 0.0, 0.0], \"force_B_lbf\": [-0.0, -0.0, -1.0], \"moment_B_in_lbf\": [0.041666666666666664, -0.0, -0.0]}, \"expected_force_B_lbf\": [0.0, 0.0, -12.0], \"expected_moment_B_in_lbf\": [6.0, 0.0, 0.0]}]}",
+      "stderr": "",
+      "exit_code": 1,
+      "protocol_valid": true,
+      "outcome": "fail",
+      "reason": ""
+    },
+    "fix": {
+      "ok": true,
+      "checks": [
+        {
+          "name": "weight",
+          "ok": true,
+          "actual": {
+            "id": "known-part",
+            "kind": "part",
+            "reference_B_in": [
+              0.0,
+              0.0,
+              0.0
+            ],
+            "force_B_lbf": [
+              -0.0,
+              -0.0,
+              -12.0
+            ],
+            "moment_B_in_lbf": [
+              -0.0,
+              -0.0,
+              -0.0
+            ]
+          },
+          "expected_force_B_lbf": [
+            0.0,
+            0.0,
+            -12.0
+          ],
+          "expected_moment_B_in_lbf": [
+            0.0,
+            0.0,
+            0.0
+          ]
+        },
+        {
+          "name": "acceleration",
+          "ok": true,
+          "actual": {
+            "id": "known-part",
+            "kind": "part",
+            "reference_B_in": [
+              0.0,
+              0.0,
+              0.0
+            ],
+            "force_B_lbf": [
+              -0.0,
+              -0.0,
+              12.0
+            ],
+            "moment_B_in_lbf": [
+              -0.0,
+              -0.0,
+              -0.0
+            ]
+          },
+          "expected_force_B_lbf": [
+            0.0,
+            0.0,
+            12.0
+          ],
+          "expected_moment_B_in_lbf": [
+            0.0,
+            0.0,
+            0.0
+          ]
+        },
+        {
+          "name": "inertia-couple",
+          "ok": true,
+          "actual": {
+            "id": "known-part",
+            "kind": "part",
+            "reference_B_in": [
+              0.0,
+              0.0,
+              0.0
+            ],
+            "force_B_lbf": [
+              -0.0,
+              -0.0,
+              -12.0
+            ],
+            "moment_B_in_lbf": [
+              6.0,
+              -0.0,
+              -0.0
+            ]
+          },
+          "expected_force_B_lbf": [
+            0.0,
+            0.0,
+            -12.0
+          ],
+          "expected_moment_B_in_lbf": [
+            6.0,
+            0.0,
+            0.0
+          ]
+        }
+      ],
+      "process_exit_code": 0,
+      "stdout": "{\"ok\": true, \"checks\": [{\"name\": \"weight\", \"ok\": true, \"actual\": {\"id\": \"known-part\", \"kind\": \"part\", \"reference_B_in\": [0.0, 0.0, 0.0], \"force_B_lbf\": [-0.0, -0.0, -12.0], \"moment_B_in_lbf\": [-0.0, -0.0, -0.0]}, \"expected_force_B_lbf\": [0.0, 0.0, -12.0], \"expected_moment_B_in_lbf\": [0.0, 0.0, 0.0]}, {\"name\": \"acceleration\", \"ok\": true, \"actual\": {\"id\": \"known-part\", \"kind\": \"part\", \"reference_B_in\": [0.0, 0.0, 0.0], \"force_B_lbf\": [-0.0, -0.0, 12.0], \"moment_B_in_lbf\": [-0.0, -0.0, -0.0]}, \"expected_force_B_lbf\": [0.0, 0.0, 12.0], \"expected_moment_B_in_lbf\": [0.0, 0.0, 0.0]}, {\"name\": \"inertia-couple\", \"ok\": true, \"actual\": {\"id\": \"known-part\", \"kind\": \"part\", \"reference_B_in\": [0.0, 0.0, 0.0], \"force_B_lbf\": [-0.0, -0.0, -12.0], \"moment_B_in_lbf\": [6.0, -0.0, -0.0]}, \"expected_force_B_lbf\": [0.0, 0.0, -12.0], \"expected_moment_B_in_lbf\": [6.0, 0.0, 0.0]}]}",
+      "stderr": "",
+      "exit_code": 0,
+      "protocol_valid": true,
+      "outcome": "pass",
+      "reason": ""
+    },
+    "force-unit": {
+      "ok": false,
+      "checks": [
+        {
+          "name": "weight",
+          "ok": false,
+          "actual": {
+            "id": "known-part",
+            "kind": "part",
+            "reference_B_in": [
+              0.0,
+              0.0,
+              0.0
+            ],
+            "force_B_lbf": [
+              -0.0,
+              -0.0,
+              -1.0
+            ],
+            "moment_B_in_lbf": [
+              -0.0,
+              -0.0,
+              -0.0
+            ]
+          },
+          "expected_force_B_lbf": [
+            0.0,
+            0.0,
+            -12.0
+          ],
+          "expected_moment_B_in_lbf": [
+            0.0,
+            0.0,
+            0.0
+          ]
+        },
+        {
+          "name": "acceleration",
+          "ok": false,
+          "actual": {
+            "id": "known-part",
+            "kind": "part",
+            "reference_B_in": [
+              0.0,
+              0.0,
+              0.0
+            ],
+            "force_B_lbf": [
+              -0.0,
+              -0.0,
+              1.0
+            ],
+            "moment_B_in_lbf": [
+              -0.0,
+              -0.0,
+              -0.0
+            ]
+          },
+          "expected_force_B_lbf": [
+            0.0,
+            0.0,
+            12.0
+          ],
+          "expected_moment_B_in_lbf": [
+            0.0,
+            0.0,
+            0.0
+          ]
+        },
+        {
+          "name": "inertia-couple",
+          "ok": false,
+          "actual": {
+            "id": "known-part",
+            "kind": "part",
+            "reference_B_in": [
+              0.0,
+              0.0,
+              0.0
+            ],
+            "force_B_lbf": [
+              -0.0,
+              -0.0,
+              -1.0
+            ],
+            "moment_B_in_lbf": [
+              6.0,
+              -0.0,
+              -0.0
+            ]
+          },
+          "expected_force_B_lbf": [
+            0.0,
+            0.0,
+            -12.0
+          ],
+          "expected_moment_B_in_lbf": [
+            6.0,
+            0.0,
+            0.0
+          ]
+        }
+      ],
+      "process_exit_code": 1,
+      "stdout": "{\"ok\": false, \"checks\": [{\"name\": \"weight\", \"ok\": false, \"actual\": {\"id\": \"known-part\", \"kind\": \"part\", \"reference_B_in\": [0.0, 0.0, 0.0], \"force_B_lbf\": [-0.0, -0.0, -1.0], \"moment_B_in_lbf\": [-0.0, -0.0, -0.0]}, \"expected_force_B_lbf\": [0.0, 0.0, -12.0], \"expected_moment_B_in_lbf\": [0.0, 0.0, 0.0]}, {\"name\": \"acceleration\", \"ok\": false, \"actual\": {\"id\": \"known-part\", \"kind\": \"part\", \"reference_B_in\": [0.0, 0.0, 0.0], \"force_B_lbf\": [-0.0, -0.0, 1.0], \"moment_B_in_lbf\": [-0.0, -0.0, -0.0]}, \"expected_force_B_lbf\": [0.0, 0.0, 12.0], \"expected_moment_B_in_lbf\": [0.0, 0.0, 0.0]}, {\"name\": \"inertia-couple\", \"ok\": false, \"actual\": {\"id\": \"known-part\", \"kind\": \"part\", \"reference_B_in\": [0.0, 0.0, 0.0], \"force_B_lbf\": [-0.0, -0.0, -1.0], \"moment_B_in_lbf\": [6.0, -0.0, -0.0]}, \"expected_force_B_lbf\": [0.0, 0.0, -12.0], \"expected_moment_B_in_lbf\": [6.0, 0.0, 0.0]}]}",
+      "stderr": "",
+      "exit_code": 1,
+      "protocol_valid": true,
+      "outcome": "fail",
+      "reason": ""
+    },
+    "couple-unit": {
+      "ok": false,
+      "checks": [
+        {
+          "name": "weight",
+          "ok": true,
+          "actual": {
+            "id": "known-part",
+            "kind": "part",
+            "reference_B_in": [
+              0.0,
+              0.0,
+              0.0
+            ],
+            "force_B_lbf": [
+              -0.0,
+              -0.0,
+              -12.0
+            ],
+            "moment_B_in_lbf": [
+              -0.0,
+              -0.0,
+              -0.0
+            ]
+          },
+          "expected_force_B_lbf": [
+            0.0,
+            0.0,
+            -12.0
+          ],
+          "expected_moment_B_in_lbf": [
+            0.0,
+            0.0,
+            0.0
+          ]
+        },
+        {
+          "name": "acceleration",
+          "ok": true,
+          "actual": {
+            "id": "known-part",
+            "kind": "part",
+            "reference_B_in": [
+              0.0,
+              0.0,
+              0.0
+            ],
+            "force_B_lbf": [
+              -0.0,
+              -0.0,
+              12.0
+            ],
+            "moment_B_in_lbf": [
+              -0.0,
+              -0.0,
+              -0.0
+            ]
+          },
+          "expected_force_B_lbf": [
+            0.0,
+            0.0,
+            12.0
+          ],
+          "expected_moment_B_in_lbf": [
+            0.0,
+            0.0,
+            0.0
+          ]
+        },
+        {
+          "name": "inertia-couple",
+          "ok": false,
+          "actual": {
+            "id": "known-part",
+            "kind": "part",
+            "reference_B_in": [
+              0.0,
+              0.0,
+              0.0
+            ],
+            "force_B_lbf": [
+              -0.0,
+              -0.0,
+              -12.0
+            ],
+            "moment_B_in_lbf": [
+              0.041666666666666664,
+              -0.0,
+              -0.0
+            ]
+          },
+          "expected_force_B_lbf": [
+            0.0,
+            0.0,
+            -12.0
+          ],
+          "expected_moment_B_in_lbf": [
+            6.0,
+            0.0,
+            0.0
+          ]
+        }
+      ],
+      "process_exit_code": 1,
+      "stdout": "{\"ok\": false, \"checks\": [{\"name\": \"weight\", \"ok\": true, \"actual\": {\"id\": \"known-part\", \"kind\": \"part\", \"reference_B_in\": [0.0, 0.0, 0.0], \"force_B_lbf\": [-0.0, -0.0, -12.0], \"moment_B_in_lbf\": [-0.0, -0.0, -0.0]}, \"expected_force_B_lbf\": [0.0, 0.0, -12.0], \"expected_moment_B_in_lbf\": [0.0, 0.0, 0.0]}, {\"name\": \"acceleration\", \"ok\": true, \"actual\": {\"id\": \"known-part\", \"kind\": \"part\", \"reference_B_in\": [0.0, 0.0, 0.0], \"force_B_lbf\": [-0.0, -0.0, 12.0], \"moment_B_in_lbf\": [-0.0, -0.0, -0.0]}, \"expected_force_B_lbf\": [0.0, 0.0, 12.0], \"expected_moment_B_in_lbf\": [0.0, 0.0, 0.0]}, {\"name\": \"inertia-couple\", \"ok\": false, \"actual\": {\"id\": \"known-part\", \"kind\": \"part\", \"reference_B_in\": [0.0, 0.0, 0.0], \"force_B_lbf\": [-0.0, -0.0, -12.0], \"moment_B_in_lbf\": [0.041666666666666664, -0.0, -0.0]}, \"expected_force_B_lbf\": [0.0, 0.0, -12.0], \"expected_moment_B_in_lbf\": [6.0, 0.0, 0.0]}]}",
+      "stderr": "",
+      "exit_code": 1,
+      "protocol_valid": true,
+      "outcome": "fail",
+      "reason": ""
+    },
+    "reaction-sign": {
+      "ok": false,
+      "checks": [
+        {
+          "name": "weight",
+          "ok": false,
+          "actual": {
+            "id": "known-part",
+            "kind": "part",
+            "reference_B_in": [
+              0.0,
+              0.0,
+              0.0
+            ],
+            "force_B_lbf": [
+              0.0,
+              0.0,
+              12.0
+            ],
+            "moment_B_in_lbf": [
+              0.0,
+              0.0,
+              0.0
+            ]
+          },
+          "expected_force_B_lbf": [
+            0.0,
+            0.0,
+            -12.0
+          ],
+          "expected_moment_B_in_lbf": [
+            0.0,
+            0.0,
+            0.0
+          ]
+        },
+        {
+          "name": "acceleration",
+          "ok": false,
+          "actual": {
+            "id": "known-part",
+            "kind": "part",
+            "reference_B_in": [
+              0.0,
+              0.0,
+              0.0
+            ],
+            "force_B_lbf": [
+              0.0,
+              0.0,
+              -12.0
+            ],
+            "moment_B_in_lbf": [
+              0.0,
+              0.0,
+              0.0
+            ]
+          },
+          "expected_force_B_lbf": [
+            0.0,
+            0.0,
+            12.0
+          ],
+          "expected_moment_B_in_lbf": [
+            0.0,
+            0.0,
+            0.0
+          ]
+        },
+        {
+          "name": "inertia-couple",
+          "ok": false,
+          "actual": {
+            "id": "known-part",
+            "kind": "part",
+            "reference_B_in": [
+              0.0,
+              0.0,
+              0.0
+            ],
+            "force_B_lbf": [
+              0.0,
+              0.0,
+              12.0
+            ],
+            "moment_B_in_lbf": [
+              -6.0,
+              0.0,
+              0.0
+            ]
+          },
+          "expected_force_B_lbf": [
+            0.0,
+            0.0,
+            -12.0
+          ],
+          "expected_moment_B_in_lbf": [
+            6.0,
+            0.0,
+            0.0
+          ]
+        }
+      ],
+      "process_exit_code": 1,
+      "stdout": "{\"ok\": false, \"checks\": [{\"name\": \"weight\", \"ok\": false, \"actual\": {\"id\": \"known-part\", \"kind\": \"part\", \"reference_B_in\": [0.0, 0.0, 0.0], \"force_B_lbf\": [0.0, 0.0, 12.0], \"moment_B_in_lbf\": [0.0, 0.0, 0.0]}, \"expected_force_B_lbf\": [0.0, 0.0, -12.0], \"expected_moment_B_in_lbf\": [0.0, 0.0, 0.0]}, {\"name\": \"acceleration\", \"ok\": false, \"actual\": {\"id\": \"known-part\", \"kind\": \"part\", \"reference_B_in\": [0.0, 0.0, 0.0], \"force_B_lbf\": [0.0, 0.0, -12.0], \"moment_B_in_lbf\": [0.0, 0.0, 0.0]}, \"expected_force_B_lbf\": [0.0, 0.0, 12.0], \"expected_moment_B_in_lbf\": [0.0, 0.0, 0.0]}, {\"name\": \"inertia-couple\", \"ok\": false, \"actual\": {\"id\": \"known-part\", \"kind\": \"part\", \"reference_B_in\": [0.0, 0.0, 0.0], \"force_B_lbf\": [0.0, 0.0, 12.0], \"moment_B_in_lbf\": [-6.0, 0.0, 0.0]}, \"expected_force_B_lbf\": [0.0, 0.0, -12.0], \"expected_moment_B_in_lbf\": [6.0, 0.0, 0.0]}]}",
+      "stderr": "",
+      "exit_code": 1,
+      "protocol_valid": true,
+      "outcome": "fail",
+      "reason": ""
+    }
+  },
+  "verdict": true,
+  "mutant_failures": {
+    "behavioral": 3,
+    "structural": 0
+  },
+  "replay_evidence": {
+    "variants": [
+      {
+        "variant": "raw",
+        "outcome": "fail",
+        "repetitions": 3
+      },
+      {
+        "variant": "fix",
+        "outcome": "pass",
+        "repetitions": 3
+      },
+      {
+        "variant": "force-unit",
+        "outcome": "fail",
+        "repetitions": 3
+      },
+      {
+        "variant": "couple-unit",
+        "outcome": "fail",
+        "repetitions": 3
+      },
+      {
+        "variant": "reaction-sign",
+        "outcome": "fail",
+        "repetitions": 3
+      },
+      {
+        "variant": "alternative",
+        "outcome": "pass",
+        "repetitions": 3
+      }
+    ],
+    "python_optimization": true,
+    "provenance_sha256": "43a8f18ed5ef82fa51261adf09def27c62a86f2e779fb8c39be7c4840f32cca3",
+    "script_sha256": "a4941617e4c835a2883a407ce80f5ac0b66012dc4ec804d9920ab27e3925cddc",
+    "scope": "Focused units regression; tuning; no whole-model physical validation"
+  }
+}

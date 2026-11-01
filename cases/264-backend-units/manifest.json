@@ -1,0 +1,25 @@
+{
+  "id": "264-backend-units",
+  "task_class": "mechanics-units",
+  "runtime": "python",
+  "strength": "independent-reference",
+  "status": "probation",
+  "suite": "tuning",
+  "hashes": {
+    "input": "ba41bfb3e21398865ec5beba22fe691286d27d4b3095e65517c64238c182c349",
+    "task": "4e5f88c99022875cd00bdfd7fc72a142841820566e20bab362f3b930909b4eec",
+    "check": "72db25b53937af6ba3428a8f25939129caa6bb00b33004be3fda0b8459cbc019"
+  },
+  "origin": {
+    "issue": "wcc118/oracles#17; wcc118/codex-local-harness#212 B1",
+    "repo": "https://github.com/wcc118/flight-loads",
+    "base_commit": "f159945c7985e4b6dccfeee8f12a8ba9fa7a0dfd",
+    "raw_commit": "uncommitted checkpoint, run 20260926T023604Z-1163287",
+    "fix_commit": "2d7a513bd39fa8a4b3c5181c76506c14dca06859",
+    "failure_class": "extra division by 12 and 144 in already consistent units",
+    "failing_model": "Qwen3-Coder-Next-FP8"
+  },
+  "registry_refs": [],
+  "memory_refs": [],
+  "notes": "Analytic weight/acceleration/inertia-couple checks, body z down and reaction on retained part. Fixed identity attitude, zero omega, mass at CG. 1e-12 absolute and relative tolerances accommodate floating point arithmetic, not discretization error. Executes actual StationModel.evaluate with explicit boundary fixtures; does not test constructor, geometry, aerodynamics, nonzero omega or real-flight physics. Tuning only."
+}
