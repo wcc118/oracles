@@ -3120,7 +3120,7 @@ class TestClassifyMutantFailure:
 
         mod = load_oracle_module(repo)
 
-        result = mod.classify_mutant_failure({"exit_code": 1, "reason": "assertion failed: expected 42, got 43"})
+        result = mod.classify_mutant_failure({"exit_code": 1, "protocol_valid": True, "reason": "assertion failed: expected 42, got 43"})
         assert result == "behavioral"
 
     def test_control_behavioral(self, tmp_path):
@@ -3133,7 +3133,7 @@ class TestClassifyMutantFailure:
 
         mod = load_oracle_module(repo)
 
-        result = mod.classify_mutant_failure({"exit_code": 1, "reason": "test failed", "error": "some other error"})
+        result = mod.classify_mutant_failure({"exit_code": 1, "protocol_valid": True, "reason": "test failed", "error": ""})
         assert result == "behavioral"
 
 

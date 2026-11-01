@@ -133,3 +133,20 @@ The lint uses a simple heuristic and can be defeated by:
 - The mutant classification (structural vs behavioral) is a second line of defense
 
 Always ensure your check actually executes workspace code, not just text-matches against it.
+
+### Check result contract
+
+A completed check prints one JSON object with boolean `ok`: exit 0 requires
+`ok: true`, exit 1 requires `ok: false`. An explicit `error`, missing/invalid JSON,
+non-boolean status, contradictory exit, unexpected exit, launch error or timeout
+is inconclusive (runner exit 2). Original process exit and output remain in the
+result for diagnosis. `run` and `validate` use the same execution boundary.
+Raw failure must be behavioral; crashes cannot qualify a raw case or mutant.
+Mutant names `raw`/`fix` are reserved and duplicate resolved mutant workspace paths
+are rejected. Separate paths alone do not establish independent mutation behavior.
+
+The no-exec lint is a heuristic, not proof that a check exercised the relevant
+behavior. Structural-message classification is also diagnostic. Independent
+review, meaningful behavioral mutations and valid alternative implementations
+remain necessary. Historical admission reports describe their original tool
+revision and are not silently promoted by a runner update.

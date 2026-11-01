@@ -324,8 +324,9 @@ def lint_no_exec(check_path):
 def classify_mutant_failure(result):
     """Classify a mutant failure as behavioral or structural.
 
-    A failing mutant run is `structural` if the JSON `reason` or `error` text contains
-    `not found` or `unexpected structure` or the exit code is 2; otherwise `behavioral`.
+    Only protocol-valid exit1 assertion results can be behavioral. Errors and
+    structural diagnostics never count. These labels are diagnostics, not proof
+    that an arbitrary check meaningfully exercised the workspace.
     Only `behavioral` failures count toward the >=2 mutant requirement.
     """
     exit_code = result.get("exit_code", 0)
@@ -333,10 +334,10 @@ def classify_mutant_failure(result):
     error = result.get("error", "")
 
     # Structural indicators
-    if exit_code == 2:
+    if exit_code != 1 or result.get("protocol_valid") is not True or error:
         return "structural"
 
-    reason_lower = (reason + error).lower()
+    reason_lower = (str(reason or "") + str(error or "")).lower()
     if "not found" in reason_lower or "unexpected structure" in reason_lower:
         return "structural"
 
@@ -712,71 +713,13 @@ def run_case(case_id, workspace, runtime=None, timeout=120, json_output=False):
         print(json.dumps({"ok": False, "error": f"check not found: {check_path}"}))
         return 2
 
-    start_time = time.time()
-
-    try:
-        if check_path.suffix == ".mjs":
-            cmd = ["node", str(check_path), workspace]
-        elif check_path.suffix == ".py":
-            cmd = ["python3", str(check_path), workspace]
-        else:
-            print(json.dumps({"ok": False, "error": f"unknown check type: {check_path.suffix}"}))
-            return 2
-
-        result = subprocess.run(
-            cmd,
-            capture_output=True,
-            text=True,
-            timeout=timeout
-        )
-
-        elapsed = time.time() - start_time
-        commit = get_oracle_commit()
-
-        # Parse output
-        output = result.stdout.strip()
-        exit_code = result.returncode
-
-        try:
-            data = json.loads(output) if output else {}
-        except json.JSONDecodeError:
-            data = {"raw_output": output}
-
-        # Add metadata
-        data["case"] = case_id
-        data["runtime"] = check_runtime
-        data["strength"] = manifest.get("strength", "")
-        data["status"] = manifest.get("status", "")
-        data["commit"] = commit
-        data["elapsed"] = elapsed
-
-        if exit_code == 2:
-            data["timeout"] = elapsed >= timeout
-
-        if json_output:
-            print(json.dumps(data, indent=2))
-        else:
-            print(json.dumps(data))
-
-        return exit_code
-
-    except subprocess.TimeoutExpired:
-        commit = get_oracle_commit()
-        data = {
-            "ok": False,
-            "error": f"timeout after {timeout}s",
-            "timeout": True,
-            "case": case_id,
-            "runtime": check_runtime,
-            "strength": manifest.get("strength", ""),
-            "status": manifest.get("status", ""),
-            "commit": commit
-        }
-        if json_output:
-            print(json.dumps(data, indent=2))
-        else:
-            print(json.dumps(data))
-        return 2
+    start_time = time.monotonic()
+    data = run_workspace(check_path, workspace, case_id, "candidate", timeout=timeout)
+    data.update(case=case_id, runtime=check_runtime,
+                strength=manifest.get("strength", ""), status=manifest.get("status", ""),
+                commit=get_oracle_commit(), elapsed=time.monotonic() - start_time)
+    print(json.dumps(data, indent=2 if json_output else None))
+    return data["exit_code"]
 
 
 def validate_case(case_id, raw_dir, fix_dir, mutants=None, write=False):
@@ -807,6 +750,14 @@ def validate_case(case_id, raw_dir, fix_dir, mutants=None, write=False):
             print(f"Validation FAILED: {lint_msg}", file=sys.stderr)
             return 2
 
+    mutants = mutants or {}
+    if set(mutants) & {"raw", "fix"}:
+        print("Validation FAILED: mutant names raw and fix are reserved", file=sys.stderr)
+        return 2
+    mutant_paths = [Path(value).resolve() for value in mutants.values()]
+    if len(set(mutant_paths)) != len(mutant_paths):
+        print("Validation FAILED: mutant workspaces must be distinct", file=sys.stderr)
+        return 2
     results = {}
 
     # Run on raw (should FAIL)
@@ -826,7 +777,7 @@ def validate_case(case_id, raw_dir, fix_dir, mutants=None, write=False):
     # Check admission procedure
     errors = []
 
-    if results["raw"]["exit_code"] != 1:
+    if results["raw"]["exit_code"] != 1 or classify_mutant_failure(results["raw"]) != "behavioral":
         errors.append(f"raw: expected exit 1 (fail), got {results['raw']['exit_code']}")
 
     if results["fix"]["exit_code"] != 0:
@@ -901,37 +852,43 @@ def validate_case(case_id, raw_dir, fix_dir, mutants=None, write=False):
     return 0 if verdict else 1
 
 
-def run_workspace(check_path, workspace, case_id, workspace_name):
-    """Run the check on a workspace and return result dict."""
+def run_workspace(check_path, workspace, case_id, workspace_name, timeout=120):
+    """Execute a check; invalid result protocols are inconclusive, never detections."""
     if check_path.suffix == ".mjs":
-        cmd = ["node", str(check_path), workspace]
+        cmd = ["node", str(check_path), str(workspace)]
     elif check_path.suffix == ".py":
-        cmd = ["python3", str(check_path), workspace]
+        cmd = [sys.executable, str(check_path), str(workspace)]
     else:
-        return {"exit_code": 2, "ok": False, "reason": f"unknown type: {check_path.suffix}"}
-
+        return {"exit_code": 2, "ok": False, "protocol_valid": False,
+                "outcome": "inconclusive", "reason": f"unknown type: {check_path.suffix}"}
     try:
-        result = subprocess.run(cmd, capture_output=True, text=True, timeout=120)
-
-        try:
-            data = json.loads(result.stdout.strip()) if result.stdout.strip() else {}
-        except json.JSONDecodeError:
-            data = {"raw_output": result.stdout.strip()}
-
-        ok = data.get("ok", result.returncode == 0)
-        reason = data.get("reason", "") or data.get("error", "")
-
-        return {
-            "exit_code": result.returncode,
-            "ok": ok,
-            "reason": reason,
-            "stdout": result.stdout.strip(),
-            "stderr": result.stderr.strip()
-        }
-    except subprocess.TimeoutExpired:
-        return {"exit_code": 2, "ok": False, "reason": "timeout", "timeout": True}
-    except Exception as e:
-        return {"exit_code": 2, "ok": False, "reason": str(e)}
+        result = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout)
+    except (subprocess.TimeoutExpired, OSError) as exc:
+        return {"exit_code": 2, "ok": False, "protocol_valid": False,
+                "outcome": "inconclusive", "reason": str(exc),
+                "error": f"timeout after {timeout}s" if isinstance(exc, subprocess.TimeoutExpired) else str(exc),
+                "timeout": isinstance(exc, subprocess.TimeoutExpired)}
+    evidence = {"process_exit_code": result.returncode,
+                "stdout": result.stdout.strip(), "stderr": result.stderr.strip()}
+    try:
+        data = json.loads(result.stdout)
+    except (json.JSONDecodeError, ValueError):
+        data = None
+    valid = (isinstance(data, dict) and type(data.get("ok")) is bool
+             and result.returncode in (0, 1)
+             and data["ok"] == (result.returncode == 0))
+    if not valid:
+        return dict(evidence, exit_code=2, ok=False, protocol_valid=False,
+                    outcome="inconclusive", reason="invalid or inconsistent check result protocol")
+    # An explicit error is not evidence of a failed behavioral assertion.
+    if data.get("error"):
+        return dict(data, **evidence, exit_code=2, ok=False, protocol_valid=True,
+                    outcome="inconclusive", reason=str(data["error"]))
+    data.update(evidence)
+    data.update(exit_code=result.returncode, protocol_valid=True,
+                outcome="pass" if data["ok"] else "fail")
+    data["reason"] = str(data.get("reason", ""))
+    return data
 
 
 def leakcheck(workspace):
